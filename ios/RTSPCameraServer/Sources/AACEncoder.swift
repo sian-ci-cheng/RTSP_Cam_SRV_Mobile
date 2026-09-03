@@ -22,29 +22,22 @@ final class AACEncoder {
     var onEncodedFrame: ((EncodedFrame) -> Void)?
 
     private var converter: AVAudioConverter?
-    private var inputFormat: AVAudioFormat?
+    private var nativeFormat: AVAudioFormat?
     private var outputFormat: AVAudioFormat?
     private let queue = DispatchQueue(label: "AACEncoder.queue")
 
     func start() {
         queue.sync {
-            guard let inputFormat = AVAudioFormat(
-                commonFormat: .pcmFormatInt16,
-                sampleRate: Self.sampleRate,
-                channels: AVAudioChannelCount(Self.channels),
-                interleaved: true
-            ), let outputFormat = AVAudioFormat(settings: [
+            guard let outputFormat = AVAudioFormat(settings: [
                 AVFormatIDKey: kAudioFormatMPEG4AAC,
                 AVSampleRateKey: Self.sampleRate,
                 AVNumberOfChannelsKey: Self.channels,
-            ]), let converter = AVAudioConverter(from: inputFormat, to: outputFormat) else {
-                print("AACEncoder: failed to create converter")
+            ]) else {
+                print("AACEncoder: failed to create output format")
                 return
             }
 
-            self.inputFormat = inputFormat
             self.outputFormat = outputFormat
-            self.converter = converter
             self.audioSpecificConfig = Self.buildAudioSpecificConfig(channels: Self.channels)
         }
     }
@@ -52,17 +45,28 @@ final class AACEncoder {
     func stop() {
         queue.sync {
             converter = nil
-            inputFormat = nil
+            nativeFormat = nil
             outputFormat = nil
             audioSpecificConfig = nil
         }
     }
 
+    /// `AVCaptureAudioDataOutput.audioSettings` (which used to force a fixed PCM format) is
+    /// unavailable on iOS, so buffers arrive in whatever format the microphone natively uses.
+    /// The converter is built from that native format the first time it's observed.
     func encode(sampleBuffer: CMSampleBuffer) {
         queue.async { [weak self] in
-            guard let self, let converter = self.converter,
-                  let inputFormat = self.inputFormat, let outputFormat = self.outputFormat,
-                  let pcmBuffer = self.pcmBuffer(from: sampleBuffer, format: inputFormat) else { return }
+            guard let self, let formatDescription = CMSampleBufferGetFormatDescription(sampleBuffer) else { return }
+            let sourceFormat = AVAudioFormat(cmAudioFormatDescription: formatDescription)
+
+            if self.converter == nil {
+                self.configureConverter(from: sourceFormat)
+            }
+
+            guard let converter = self.converter, let outputFormat = self.outputFormat,
+                  let (pcmBuffer, retainedBlockBuffer) = self.pcmBuffer(from: sampleBuffer, format: sourceFormat) else { return }
+            // `retainedBlockBuffer` backs pcmBuffer's storage (no-copy) and must outlive the convert() call below.
+            _ = retainedBlockBuffer
 
             let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
             let outputBuffer = AVAudioCompressedBuffer(format: outputFormat, packetCapacity: 1, maximumPacketSize: 4096)
@@ -85,21 +89,33 @@ final class AACEncoder {
         }
     }
 
-    private func pcmBuffer(from sampleBuffer: CMSampleBuffer, format: AVAudioFormat) -> AVAudioPCMBuffer? {
-        guard let blockBuffer = CMSampleBufferGetDataBuffer(sampleBuffer) else { return nil }
-        let numSamples = CMSampleBufferGetNumSamples(sampleBuffer)
-        guard numSamples > 0,
-              let pcmBuffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(numSamples)),
-              let channelData = pcmBuffer.int16ChannelData else { return nil }
-        pcmBuffer.frameLength = AVAudioFrameCount(numSamples)
+    private func configureConverter(from sourceFormat: AVAudioFormat) {
+        guard let outputFormat, let converter = AVAudioConverter(from: sourceFormat, to: outputFormat) else {
+            print("AACEncoder: failed to create converter for native format \(sourceFormat)")
+            return
+        }
+        self.nativeFormat = sourceFormat
+        self.converter = converter
+    }
 
-        var length = 0
-        var dataPointer: UnsafeMutablePointer<Int8>?
-        guard CMBlockBufferGetDataPointer(blockBuffer, atOffset: 0, lengthAtOffsetOut: nil, totalLengthOut: &length, dataPointerOut: &dataPointer) == noErr,
-              let dataPointer else { return nil }
-
-        memcpy(channelData[0], dataPointer, length)
-        return pcmBuffer
+    /// Returns the PCM buffer alongside the CMBlockBuffer backing its storage (the PCM buffer is
+    /// a no-copy view into it) — callers must keep the block buffer alive as long as they use the PCM buffer.
+    private func pcmBuffer(from sampleBuffer: CMSampleBuffer, format: AVAudioFormat) -> (AVAudioPCMBuffer, CMBlockBuffer)? {
+        var audioBufferList = AudioBufferList()
+        var blockBuffer: CMBlockBuffer?
+        let status = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
+            sampleBuffer,
+            bufferListSizeNeededOut: nil,
+            bufferListOut: &audioBufferList,
+            bufferListSize: MemoryLayout<AudioBufferList>.size,
+            blockBufferAllocator: nil,
+            blockBufferMemoryAllocator: nil,
+            flags: kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment,
+            blockBufferOut: &blockBuffer
+        )
+        guard status == noErr, let blockBuffer,
+              let pcmBuffer = AVAudioPCMBuffer(pcmFormat: format, bufferListNoCopy: &audioBufferList) else { return nil }
+        return (pcmBuffer, blockBuffer)
     }
 
     /// Builds the 2-byte MPEG-4 AudioSpecificConfig for AAC-LC:

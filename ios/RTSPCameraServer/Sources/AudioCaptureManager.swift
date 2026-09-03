@@ -25,15 +25,8 @@ final class AudioCaptureManager: NSObject {
         }
         session.addInput(input)
 
-        audioOutput.audioSettings = [
-            AVFormatIDKey: kAudioFormatLinearPCM,
-            AVSampleRateKey: AACEncoder.sampleRate,
-            AVNumberOfChannelsKey: AACEncoder.channels,
-            AVLinearPCMBitDepthKey: 16,
-            AVLinearPCMIsBigEndianKey: false,
-            AVLinearPCMIsFloatKey: false,
-            AVLinearPCMIsNonInterleaved: false,
-        ]
+        // `audioSettings` is unavailable on iOS, so the output vends samples in the
+        // microphone's native format; AACEncoder builds its converter from that format.
         audioOutput.setSampleBufferDelegate(self, queue: captureQueue)
         guard session.canAddOutput(audioOutput) else { return false }
         session.addOutput(audioOutput)
