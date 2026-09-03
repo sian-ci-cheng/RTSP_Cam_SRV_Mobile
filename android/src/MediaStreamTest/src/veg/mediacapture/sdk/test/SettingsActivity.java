@@ -42,107 +42,34 @@ public class SettingsActivity extends PreferenceActivity {
 	Preference streaming_port = null;
 	
 
-	void set_server_changed(){
+	private void set_changed_flag(String key){
 		if(settings == null)
 			return;
-		
+
 		Editor ed = settings.edit();
-		ed.putInt("server_changed", 1);
+		ed.putInt(key, 1);
 		ed.apply();
 	}
-	
+
+	void set_server_changed(){
+		set_changed_flag("server_changed");
+	}
+
 	void set_record_changed(){
-		if(settings == null)
-			return;
-		
-		Editor ed = settings.edit();
-		ed.putInt("record_changed", 1);
-		ed.apply();
+		set_changed_flag("record_changed");
 	}
 	void set_record_changed_audio(){
-		if(settings == null)
-			return;
-		
-		Editor ed = settings.edit();
-		ed.putInt("record_changed_audio", 1);
-		ed.apply();
+		set_changed_flag("record_changed_audio");
 	}
-	
+
 	void set_storage_changed(){
-		if(settings == null)
-			return;
-		
-		Editor ed = settings.edit();
-		ed.putInt("storage_changed", 1);
-		ed.apply();
+		set_changed_flag("storage_changed");
 	}
-	
+
 	void set_streaming_changed(){
-		if(settings == null)
-			return;
-		
-		Editor ed = settings.edit();
-		ed.putInt("streaming_changed", 1);
-		ed.apply();
+		set_changed_flag("streaming_changed");
 	}
 
-	private long get_bitrate_kbps(){
-		//HRV
-		String sbitrate = settings.getString("HRVbitrate", "5000");
-		int HRVbitrate = Integer.parseInt(sbitrate)*1000;
-		//LRV
-		sbitrate = settings.getString("LRVbitrate", "375");
-		int LRVbitrate = Integer.parseInt(sbitrate)*1000;
-
-		//audio bitrate
-		sbitrate = settings.getString("audio_bitrate", "128");
-		int abitrate = Integer.parseInt(sbitrate)*1000;
-		
-		long res = ((long)HRVbitrate+(long)LRVbitrate+(long)abitrate*2)/1000;
-		return res;
-	}
-	
-	long convert_time_to_mb(String time){
-		String[] sp = time.split(":");
-		if(sp.length < 1){
-			return 0;
-		}
-		long bitrate = get_bitrate_kbps();
-		Log.i(TAG, "=convert_time_to_mb time="+time+" bitrate="+bitrate+"kbps");
-		long sec = 0;
-		int i=0;
-		try{
-			for(String s:sp){
-				switch(i){
-				case 0:
-					sec += 3600*Integer.parseInt(s);
-					break;
-				case 1:
-					sec += 60*Integer.parseInt(s);
-					break;
-				}
-				i++;
-				if(i>1)
-					break;
-			}
-		}catch(NumberFormatException e){
-			e.printStackTrace();
-		}
-		Log.i(TAG, "=convert_time_to_mb sec="+sec);
-
-		long mb = sec*bitrate/8/1024;
-		Log.i(TAG, "=convert_time_to_mb mb="+mb);
-		return mb;
-	}
-	String convert_mb_to_time(long mb){
-		long bitrate = get_bitrate_kbps();
-		if(bitrate == 0){
-			bitrate = 10000;
-		}
-		long sec = mb*1024*8/bitrate;
-		return "1"; //HTTPDoc.get_clip_str3(sec);
-	}
-	
 	void update_record_audio_enable(boolean isenabled){
 		record_audio_enable.setSummary(isenabled?"audio ON":"audio OFF");
 		record_audioBitrate.setEnabled(isenabled);
@@ -183,9 +110,9 @@ public class SettingsActivity extends PreferenceActivity {
 				Log.i(TAG, "NO");
 			}
 		}).show();
-		
+
 		return true;
-	};
+	}
 
 	public void on_reset_settings()
 	{
@@ -326,15 +253,13 @@ public class SettingsActivity extends PreferenceActivity {
 
 
 		final ListPreference record_bitrateMode = (ListPreference) findPreference("bitrateMode");
-		String sbitrateMode = settings.getString("bitrateMode", "-1");
 		record_bitrateMode.setSummary( getSBitrateMode(record_bitrateMode.getValue()));
-		
+
 		final ListPreference record_HRVbitrate = (ListPreference) findPreference("HRVbitrate");
 		String sHRVbitrate = settings.getString("HRVbitrate", "700");
 		record_HRVbitrate.setSummary(sHRVbitrate+" kbps");
 
 		final ListPreference record_videoRes = (ListPreference) findPreference("videoRes");
-		//String srecord_videoRes = settings.getString("videoRes", "1280");
 		CharSequence[] resE = record_videoRes.getEntries();
 		CharSequence[] resEV = record_videoRes.getEntryValues();
 		
@@ -400,22 +325,19 @@ public class SettingsActivity extends PreferenceActivity {
 		common_header.bind(getListView());
 		
 		common_header.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
-		
 			@Override
 			public boolean onPreferenceClick(Preference preference) {
-				// TODO Auto-generated method stub
-				//button_reset.setVisibility(View.VISIBLE);
 				Log.i(TAG, "=on reset Pressed");
 				check_alert_reset();
 				return true;
 			}
-			
 		});
-		
+
 		streaming_serverType.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
 			public boolean onPreferenceChange(Preference preference, Object newValue) {
-				preference.setSummary(getServerType(newValue.toString()));
-				update_streaming_rtmp_enable(!getServerType(newValue.toString()).equals("RTSP"));
+				String serverType = getServerType(newValue.toString());
+				preference.setSummary(serverType);
+				update_streaming_rtmp_enable(!serverType.equals("RTSP"));
 				set_server_changed();
 				return true;
 			}
