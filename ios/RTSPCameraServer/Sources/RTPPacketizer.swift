@@ -35,6 +35,24 @@ enum RTPPacketizer {
         return (packets, seq)
     }
 
+    /// Builds a single RTP packet for one AAC access unit, per RFC 3640 §3.2.1 ("AAC-hbr").
+    /// Assumes the AU fits in one packet, which holds for AAC-LC at the bitrates this app uses
+    /// (a 1024-sample frame is well under `maxPayloadSize` even at high audio bitrates).
+    static func packetizeAAC(auData: Data, sequence: UInt16, timestamp: UInt32, ssrc: UInt32, payloadType: UInt8) -> Packet {
+        var payload = Data()
+        // AU-headers-length, in bits: one 16-bit AU-header follows.
+        payload.append(0x00)
+        payload.append(0x10)
+        // AU-header: 13-bit AU-size, 3-bit AU-Index (0 for the first/only AU in this packet).
+        let auHeader = (UInt16(auData.count & 0x1FFF)) << 3
+        payload.append(UInt8(auHeader >> 8))
+        payload.append(UInt8(auHeader & 0xFF))
+        payload.append(auData)
+
+        let header = rtpHeader(sequence: sequence, timestamp: timestamp, ssrc: ssrc, marker: true, payloadType: payloadType)
+        return Packet(payload: header + payload)
+    }
+
     private static func fragmentNAL(_ nal: Data) -> [Data] {
         guard let nalHeader = nal.first else { return [] }
         let forbiddenAndNRI = nalHeader & 0b1110_0000

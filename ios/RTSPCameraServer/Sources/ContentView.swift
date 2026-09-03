@@ -13,6 +13,13 @@ struct ContentView: View {
             Text(viewModel.statusText)
                 .font(.headline)
 
+            if viewModel.isRunning {
+                Label(viewModel.isAudioEnabled ? "Audio ON" : "Audio OFF (mic permission denied)",
+                      systemImage: viewModel.isAudioEnabled ? "mic.fill" : "mic.slash.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(viewModel.isAudioEnabled ? .primary : .secondary)
+            }
+
             Picker("Resolution", selection: $viewModel.resolution) {
                 ForEach(viewModel.availableResolutions) { resolution in
                     Text(resolution.rawValue).tag(resolution)
@@ -56,6 +63,7 @@ final class StreamViewModel: ObservableObject {
     @Published var isRunning = false
     @Published var statusText = "Stopped"
     @Published var addresses: [String] = []
+    @Published var isAudioEnabled = false
     @Published var resolution: StreamResolution
     let availableResolutions: [StreamResolution]
 
@@ -79,7 +87,7 @@ final class StreamViewModel: ObservableObject {
                 }
                 self.camera.start()
 
-                let server = RTSPServer(port: 8554, encoder: self.camera.encoder)
+                let server = RTSPServer(port: 8554, encoder: self.camera.encoder, audioEncoder: self.camera.audio.encoder)
                 server.onStatusChange = { [weak self] status in
                     DispatchQueue.main.async { self?.statusText = status }
                 }
@@ -88,6 +96,7 @@ final class StreamViewModel: ObservableObject {
 
                 self.addresses = NetworkUtils.ipv4Address().map { $0.address }
                 self.isRunning = true
+                self.isAudioEnabled = self.camera.isAudioEnabled
                 self.statusText = "Starting..."
             }
         }
@@ -98,6 +107,7 @@ final class StreamViewModel: ObservableObject {
         server = nil
         camera.stop()
         isRunning = false
+        isAudioEnabled = false
         statusText = "Stopped"
     }
 }

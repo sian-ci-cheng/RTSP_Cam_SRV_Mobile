@@ -7,9 +7,11 @@ final class CameraCaptureManager: NSObject {
     private let captureQueue = DispatchQueue(label: "CameraCaptureManager.queue")
 
     let encoder = H264Encoder()
+    let audio = AudioCaptureManager()
 
     private(set) var width: Int32 = 1280
     private(set) var height: Int32 = 720
+    private(set) var isAudioEnabled = false
 
     /// Resolutions the back camera actually supports, in the order declared by StreamResolution.
     static func supportedResolutions() -> [StreamResolution] {
@@ -20,20 +22,28 @@ final class CameraCaptureManager: NSObject {
         return supported.isEmpty ? [.hd720p] : supported
     }
 
+    /// Requests camera (required) and microphone (best-effort) access, then configures the
+    /// session. Denied microphone access still lets the stream start, just without audio.
     func requestAccessAndConfigure(resolution: StreamResolution, completion: @escaping (Bool) -> Void) {
-        AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
-            guard granted, let self else {
+        AVCaptureDevice.requestAccess(for: .video) { [weak self] videoGranted in
+            guard let self else {
                 completion(false)
                 return
             }
-            self.captureQueue.async {
-                self.configureSession(resolution: resolution)
-                completion(true)
+            guard videoGranted else {
+                completion(false)
+                return
+            }
+            self.audio.requestAccess { audioGranted in
+                self.captureQueue.async {
+                    self.configureSession(resolution: resolution, includeAudio: audioGranted)
+                    completion(true)
+                }
             }
         }
     }
 
-    private func configureSession(resolution: StreamResolution) {
+    private func configureSession(resolution: StreamResolution, includeAudio: Bool) {
         session.beginConfiguration()
 
         guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
@@ -60,6 +70,8 @@ final class CameraCaptureManager: NSObject {
             connection.videoOrientation = .landscapeRight
         }
 
+        isAudioEnabled = includeAudio && audio.addToSession(session)
+
         session.commitConfiguration()
 
         width = resolution.width
@@ -77,6 +89,7 @@ final class CameraCaptureManager: NSObject {
         captureQueue.async { [weak self] in
             self?.session.stopRunning()
             self?.encoder.stop()
+            self?.audio.stop()
         }
     }
 }

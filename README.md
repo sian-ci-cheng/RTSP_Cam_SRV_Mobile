@@ -17,7 +17,9 @@ See [android/scripts/build_and_deploy.sh](android/scripts/build_and_deploy.sh) t
 ## iOS ([ios/RTSPCameraServer/](ios/RTSPCameraServer/))
 
 A minimal counterpart built with `Network.framework` + `VideoToolbox` (no third-party RTSP library).
-Single client, H.264 only, RTP delivered over the RTSP TCP connection itself (interleaved mode) —
-picks a resolution (480p/720p/1080p/4K, whatever the camera supports) and serves `rtsp://<device-ip>:8554/`.
+Single client, H.264 video + AAC-LC audio, RTP delivered over the RTSP TCP connection itself
+(interleaved mode) — picks a resolution (480p/720p/1080p/4K, whatever the camera supports) and
+serves `rtsp://<device-ip>:8554/`. Microphone access is best-effort: denying it still streams
+video-only.
 
 See [ios/RTSPCameraServer/README.md](ios/RTSPCameraServer/README.md) for setup and known limitations.

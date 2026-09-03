@@ -20,6 +20,8 @@
 	<string>1</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Used to stream the camera over RTSP.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Used to stream audio alongside the camera over RTSP.</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 </dict>

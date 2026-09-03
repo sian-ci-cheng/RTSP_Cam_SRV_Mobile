@@ -4,7 +4,9 @@ import CoreMedia
 
 /// Minimal single-client RTSP server: OPTIONS/DESCRIBE/SETUP/PLAY/TEARDOWN over
 /// RTP-over-TCP interleaved mode (RFC 2326 §10.12). No RTSP/UDP, no multi-client —
-/// this is intentionally the smallest thing that lets VLC/ffplay connect and see video.
+/// this is intentionally the smallest thing that lets VLC/ffplay connect and see video
+/// (and, when the microphone was granted, hear audio too: H.264 on interleaved channel
+/// 0/1, AAC-LC on channel 2/3, each set up as its own RTSP track).
 final class RTSPServer {
     private final class ClientSession {
         let connection: NWConnection
@@ -16,6 +18,11 @@ final class RTSPServer {
         let rtpChannel: UInt8 = 0
         let rtcpChannel: UInt8 = 1
 
+        var audioSequenceNumber: UInt16 = UInt16.random(in: 0...UInt16.max)
+        let audioSSRC: UInt32 = UInt32.random(in: 0...UInt32.max)
+        let audioRtpChannel: UInt8 = 2
+        let audioRtcpChannel: UInt8 = 3
+
         init(connection: NWConnection) {
             self.connection = connection
         }
@@ -23,19 +30,27 @@ final class RTSPServer {
 
     private let port: UInt16
     private let encoder: H264Encoder
+    private let audioEncoder: AACEncoder?
     private var listener: NWListener?
     private var clients: [ObjectIdentifier: ClientSession] = [:]
     private let queue = DispatchQueue(label: "RTSPServer.queue")
 
     private var baseMediaTime: CMTime?
+    private var audioTimestamp: UInt32 = 0
 
     var onStatusChange: ((String) -> Void)?
 
-    init(port: UInt16 = 8554, encoder: H264Encoder) {
+    /// `audioEncoder` is optional: pass nil (or one that never produces an AudioSpecificConfig,
+    /// e.g. microphone access was denied) to serve video-only, exactly as before audio support existed.
+    init(port: UInt16 = 8554, encoder: H264Encoder, audioEncoder: AACEncoder? = nil) {
         self.port = port
         self.encoder = encoder
+        self.audioEncoder = audioEncoder
         self.encoder.onEncodedFrame = { [weak self] frame in
             self?.broadcast(frame: frame)
+        }
+        self.audioEncoder?.onEncodedFrame = { [weak self] frame in
+            self?.broadcastAudio(frame: frame)
         }
     }
 
@@ -127,6 +142,7 @@ final class RTSPServer {
         let parts = requestLine.split(separator: " ")
         guard parts.count >= 2 else { return }
         let method = String(parts[0])
+        let url = String(parts[1])
 
         var headers: [String: String] = [:]
         for line in lines.dropFirst() {
@@ -143,7 +159,7 @@ final class RTSPServer {
         case "DESCRIBE":
             send(client: client, response: describeResponse(cseq: cseq))
         case "SETUP":
-            send(client: client, response: setupResponse(cseq: cseq, client: client))
+            send(client: client, response: setupResponse(cseq: cseq, client: client, url: url))
         case "PLAY":
             client.isPlaying = true
             send(client: client, response: playResponse(cseq: cseq, client: client))
@@ -170,24 +186,41 @@ final class RTSPServer {
             : "42001E"
         let spropParameterSets = "\(sps.base64EncodedString()),\(pps.base64EncodedString())"
 
-        let sdp = """
-        v=0\r
-        o=- 0 0 IN IP4 0.0.0.0\r
-        s=RTSPCameraServer\r
-        c=IN IP4 0.0.0.0\r
-        t=0 0\r
-        a=tool:RTSPCameraServer\r
-        m=video 0 RTP/AVP 96\r
-        a=rtpmap:96 H264/90000\r
-        a=fmtp:96 packetization-mode=1;profile-level-id=\(profileLevelID);sprop-parameter-sets=\(spropParameterSets)\r
-        a=control:track1\r
-        """
-        let body = sdp
+        var lines = [
+            "v=0",
+            "o=- 0 0 IN IP4 0.0.0.0",
+            "s=RTSPCameraServer",
+            "c=IN IP4 0.0.0.0",
+            "t=0 0",
+            "a=tool:RTSPCameraServer",
+            "m=video 0 RTP/AVP 96",
+            "a=rtpmap:96 H264/90000",
+            "a=fmtp:96 packetization-mode=1;profile-level-id=\(profileLevelID);sprop-parameter-sets=\(spropParameterSets)",
+            "a=control:track1",
+        ]
+
+        // Only advertise the audio track once the encoder has actually produced its config
+        // (i.e. the microphone was granted and the session started) -- a client that never sees
+        // an m=audio line here simply plays video-only, exactly like before audio existed.
+        if let audioEncoder, let audioConfig = audioEncoder.audioSpecificConfig {
+            let configHex = audioConfig.map { String(format: "%02X", $0) }.joined()
+            lines += [
+                "m=audio 0 RTP/AVP 97",
+                "a=rtpmap:97 mpeg4-generic/\(Int(AACEncoder.sampleRate))/\(AACEncoder.channels)",
+                "a=fmtp:97 streamtype=5;profile-level-id=1;mode=AAC-hbr;sizelength=13;indexlength=3;indexdeltalength=3;config=\(configHex)",
+                "a=control:track2",
+            ]
+        }
+
+        let body = lines.map { $0 + "\r" }.joined(separator: "\n")
         return "RTSP/1.0 200 OK\r\nCSeq: \(cseq)\r\nContent-Base: rtsp://0.0.0.0/\r\nContent-Type: application/sdp\r\nContent-Length: \(body.utf8.count)\r\n\r\n\(body)"
     }
 
-    private func setupResponse(cseq: String, client: ClientSession) -> String {
-        let transport = "RTP/AVP/TCP;unicast;interleaved=\(client.rtpChannel)-\(client.rtcpChannel)"
+    private func setupResponse(cseq: String, client: ClientSession, url: String) -> String {
+        let isAudioTrack = url.hasSuffix("track2")
+        let rtpChannel = isAudioTrack ? client.audioRtpChannel : client.rtpChannel
+        let rtcpChannel = isAudioTrack ? client.audioRtcpChannel : client.rtcpChannel
+        let transport = "RTP/AVP/TCP;unicast;interleaved=\(rtpChannel)-\(rtcpChannel)"
         return "RTSP/1.0 200 OK\r\nCSeq: \(cseq)\r\nTransport: \(transport)\r\nSession: \(client.rtspSessionID)\r\n\r\n"
     }
 
@@ -220,17 +253,42 @@ final class RTSPServer {
                     payloadType: 96
                 )
                 client.sequenceNumber = nextSeq
-                self.sendInterleaved(packets: packets, client: client)
+                self.sendInterleaved(packets: packets, channel: client.rtpChannel, client: client)
             }
         }
     }
 
-    private func sendInterleaved(packets: [RTPPacketizer.Packet], client: ClientSession) {
+    private func broadcastAudio(frame: AACEncoder.EncodedFrame) {
+        queue.async { [weak self] in
+            guard let self else { return }
+            let playingClients = self.clients.values.filter { $0.isPlaying }
+            guard !playingClients.isEmpty else { return }
+
+            let timestamp = self.audioTimestamp
+            // AAC-LC always encodes a fixed 1024 samples per frame, so the RTP clock (which runs
+            // at the sample rate for mpeg4-generic) advances by exactly that much each time.
+            self.audioTimestamp = self.audioTimestamp &+ AACEncoder.samplesPerFrame
+
+            for client in playingClients {
+                let packet = RTPPacketizer.packetizeAAC(
+                    auData: frame.data,
+                    sequence: client.audioSequenceNumber,
+                    timestamp: timestamp,
+                    ssrc: client.audioSSRC,
+                    payloadType: 97
+                )
+                client.audioSequenceNumber = client.audioSequenceNumber &+ 1
+                self.sendInterleaved(packets: [packet], channel: client.audioRtpChannel, client: client)
+            }
+        }
+    }
+
+    private func sendInterleaved(packets: [RTPPacketizer.Packet], channel: UInt8, client: ClientSession) {
         var outgoing = Data()
         for packet in packets {
             let length = UInt16(packet.payload.count)
             outgoing.append(0x24) // '$'
-            outgoing.append(client.rtpChannel)
+            outgoing.append(channel)
             outgoing.append(UInt8(length >> 8))
             outgoing.append(UInt8(length & 0xFF))
             outgoing.append(packet.payload)

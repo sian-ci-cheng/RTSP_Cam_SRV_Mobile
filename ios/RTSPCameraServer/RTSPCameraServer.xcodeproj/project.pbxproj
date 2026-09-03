@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		11AA22BB33CC44DD55EE66FF /* AudioCaptureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF66 /* AudioCaptureManager.swift */; };
+		FF00EE11DD22CC33BB44AA55 /* AACEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99887766554433221100AABB /* AACEncoder.swift */; };
 		362D67892016E97FEFD016A9 /* RTPPacketizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1252AB81FBF8CD0B74DD10A /* RTPPacketizer.swift */; };
 		3B9C0A12649B137738324C18 /* RTSPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B90DE1BC6F0705AEF8D6EED /* RTSPServer.swift */; };
 		48FD2FA325DC6C2F9D39D483 /* RTSPCameraServerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EE152BDD02483BBC21852EF /* RTSPCameraServerApp.swift */; };
@@ -19,6 +21,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		AA11BB22CC33DD44EE55FF66 /* AudioCaptureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCaptureManager.swift; sourceTree = "<group>"; };
+		99887766554433221100AABB /* AACEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AACEncoder.swift; sourceTree = "<group>"; };
 		002AAADAD593F2DCEF83A671 /* StreamResolution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamResolution.swift; sourceTree = "<group>"; };
 		03271DCE53F025A75E3EF31C /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		1312B5247B9A3239CFDBCD5C /* CameraCaptureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraCaptureManager.swift; sourceTree = "<group>"; };
@@ -36,7 +40,9 @@
 		551AC244F05BF35CD40D1F44 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
+				99887766554433221100AABB /* AACEncoder.swift */,
 				60FC3D9A2D0612C723F53D29 /* Assets.xcassets */,
+				AA11BB22CC33DD44EE55FF66 /* AudioCaptureManager.swift */,
 				1312B5247B9A3239CFDBCD5C /* CameraCaptureManager.swift */,
 				03271DCE53F025A75E3EF31C /* ContentView.swift */,
 				5BCF4757439BB32A27135341 /* H264Encoder.swift */,
@@ -136,6 +142,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FF00EE11DD22CC33BB44AA55 /* AACEncoder.swift in Sources */,
+				11AA22BB33CC44DD55EE66FF /* AudioCaptureManager.swift in Sources */,
 				B9617A6C33B542F69049B3D6 /* CameraCaptureManager.swift in Sources */,
 				4D960E8FFE08C48F97CEE133 /* ContentView.swift in Sources */,
 				C60EEAA8EEE6E6E6265443E7 /* H264Encoder.swift in Sources */,

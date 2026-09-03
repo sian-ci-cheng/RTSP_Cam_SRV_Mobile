@@ -12,6 +12,7 @@ targets:
       path: Sources/Info.plist
       properties:
         NSCameraUsageDescription: "Used to stream the camera over RTSP."
+        NSMicrophoneUsageDescription: "Used to stream audio alongside the camera over RTSP."
         UILaunchScreen: {}
     settings:
       base:
