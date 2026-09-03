@@ -68,7 +68,7 @@ enum RTPPacketizer {
             let isFirst = offset == payload.startIndex
             let isLast = end == payload.endIndex
 
-            var fuIndicator = forbiddenAndNRI | 28 // FU-A type
+            let fuIndicator = forbiddenAndNRI | 28 // FU-A type
             var fuHeader = nalType
             if isFirst { fuHeader |= 0b1000_0000 }
             if isLast { fuHeader |= 0b0100_0000 }
@@ -78,7 +78,6 @@ enum RTPPacketizer {
             fragments.append(fragment)
 
             offset = end
-            _ = fuIndicator // silence unused warning in some toolchains
         }
         return fragments
     }
