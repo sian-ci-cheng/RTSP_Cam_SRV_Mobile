@@ -43,8 +43,8 @@ public class CheckBoxPreferenceInteger extends CheckBoxPreference
     	
         int returnValue = getSharedPreferences().getInt(getKey(), defaultValueInt);
         Log.v(TAG, "getPersistedBoolean: " + getKey() + returnValue);
-        
-    	return (getSharedPreferences().getInt(getKey(), defaultValueInt) == 1);
+
+    	return returnValue == 1;
     }
  
     @Override
