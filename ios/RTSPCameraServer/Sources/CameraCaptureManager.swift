@@ -22,9 +22,10 @@ final class CameraCaptureManager: NSObject {
         return supported.isEmpty ? [.hd720p] : supported
     }
 
-    /// Requests camera (required) and microphone (best-effort) access, then configures the
-    /// session. Denied microphone access still lets the stream start, just without audio.
-    func requestAccessAndConfigure(resolution: StreamResolution, completion: @escaping (Bool) -> Void) {
+    /// Requests camera (required) and, if `wantsAudio` is true, microphone (best-effort) access,
+    /// then configures the session. Denied microphone access still lets the stream start, just
+    /// without audio.
+    func requestAccessAndConfigure(resolution: StreamResolution, wantsAudio: Bool, completion: @escaping (Bool) -> Void) {
         AVCaptureDevice.requestAccess(for: .video) { [weak self] videoGranted in
             guard let self else {
                 completion(false)
@@ -32,6 +33,13 @@ final class CameraCaptureManager: NSObject {
             }
             guard videoGranted else {
                 completion(false)
+                return
+            }
+            guard wantsAudio else {
+                self.captureQueue.async {
+                    self.configureSession(resolution: resolution, includeAudio: false)
+                    completion(true)
+                }
                 return
             }
             self.audio.requestAccess { audioGranted in

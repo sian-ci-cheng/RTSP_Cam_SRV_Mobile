@@ -18,6 +18,8 @@ struct ContentView: View {
                       systemImage: viewModel.isAudioEnabled ? "mic.fill" : "mic.slash.fill")
                     .font(.subheadline)
                     .foregroundStyle(viewModel.isAudioEnabled ? .primary : .secondary)
+            } else {
+                Toggle("Record Audio", isOn: $viewModel.wantsAudio)
             }
 
             Picker("Resolution", selection: $viewModel.resolution) {
@@ -64,6 +66,7 @@ final class StreamViewModel: ObservableObject {
     @Published var statusText = "Stopped"
     @Published var addresses: [String] = []
     @Published var isAudioEnabled = false
+    @Published var wantsAudio = true
     @Published var resolution: StreamResolution
     let availableResolutions: [StreamResolution]
 
@@ -78,7 +81,7 @@ final class StreamViewModel: ObservableObject {
     }
 
     private func start() {
-        camera.requestAccessAndConfigure(resolution: resolution) { [weak self] granted in
+        camera.requestAccessAndConfigure(resolution: resolution, wantsAudio: wantsAudio) { [weak self] granted in
             guard let self else { return }
             DispatchQueue.main.async {
                 guard granted else {
