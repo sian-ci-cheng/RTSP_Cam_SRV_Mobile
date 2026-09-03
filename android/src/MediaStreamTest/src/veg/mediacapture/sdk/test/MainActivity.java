@@ -86,8 +86,7 @@ public class MainActivity extends Activity implements MediaCaptureCallback
     private MulticastLock multicastLock = null;
     private PowerManager.WakeLock mWakeLock;
     
-	private CaptureState capture_state = CaptureState.Closed; 
-	private int mOldMsg = 0;
+	private CaptureState capture_state = CaptureState.Closed;
 
 	private Toast toastShot = null;
 	
@@ -156,9 +155,7 @@ public class MainActivity extends Activity implements MediaCaptureCallback
 							 sss += ". Audio OFF";
 						 if(rtmp_status == (-999)){
 							 sss = "Streaming stopped. DEMO VERSION limitation";
-							 capturer.Stop();
-							 led.setImageResource(R.drawable.led_green);
-        	        		 mbuttonRec.setImageResource(R.drawable.ic_fiber_manual_record_red);
+							 stopOnDemoLimitReached();
 						 }else
 						 if(rtmp_status != (-1)){
 
@@ -187,9 +184,7 @@ public class MainActivity extends Activity implements MediaCaptureCallback
 						 if(rec_status != -1){
 						 	if(rec_status == (-999)){
 								sss = "Streaming stopped. DEMO VERSION limitation";
-								capturer.Stop();
-								led.setImageResource(R.drawable.led_green);
-								mbuttonRec.setImageResource(R.drawable.ic_fiber_manual_record_red);
+								stopOnDemoLimitReached();
 						 	}else
 						 	if(rec_status != 0 && rec_status != (-999)){
 								sss3 += "REC Err:"+rec_status;
@@ -212,24 +207,23 @@ public class MainActivity extends Activity implements MediaCaptureCallback
 	    }
 	};
 
-	// All event are sent to event handlers    
+	// All event are sent to event handlers
 	@Override
 	public int OnCaptureStatus(int arg) {
 		CaptureNotifyCodes status = CaptureNotifyCodes.forValue(arg);
 		if (handler == null || status == null)
 			return 0;
-		
+
 		//Log.v(TAG, "=OnCaptureStatus status=" + arg);
-	    switch (CaptureNotifyCodes.forValue(arg)) 
+	    switch (CaptureNotifyCodes.forValue(arg))
 	    {
-	        default:     
+	        default:
 				Message msg = new Message();
 				msg.obj = status;
-				handler.removeMessages(mOldMsg);
-				mOldMsg = msg.what;
+				handler.removeMessages(msg.what);
 				handler.sendMessage(msg);
 	    }
-	    
+
 		return 0;
 	}
 
@@ -282,8 +276,8 @@ public class MainActivity extends Activity implements MediaCaptureCallback
         }
 
 		String spath = getRecordPath();
-        if(spath == null){
-            Log.e(TAG, "=OnCaptureReceiveData spath is null");
+        if(spath.isEmpty()){
+            Log.e(TAG, "=OnCaptureReceiveData spath is empty");
             StopJPEG();
             return 0;
         }
@@ -527,7 +521,21 @@ public class MainActivity extends Activity implements MediaCaptureCallback
 		return ( capturer != null && capturer.getState() == CaptureState.Started );
 	}
 
-	
+	private void stopOnDemoLimitReached(){
+		capturer.Stop();
+		led.setImageResource(R.drawable.led_green);
+		mbuttonRec.setImageResource(R.drawable.ic_fiber_manual_record_red);
+	}
+
+	private static int parseIntOrDefault(String s, int def){
+		try{
+			return Integer.parseInt(s);
+		}catch(NumberFormatException e){
+			e.printStackTrace();
+			return def;
+		}
+	}
+
 	public String getRecordPath()
 	{
 		File mediaStorageDir = new File(Environment.getExternalStoragePublicDirectory(
@@ -569,37 +577,16 @@ public class MainActivity extends Activity implements MediaCaptureCallback
 		}
     	
 		String sres = settings.getString("videoRes", "1280");
-		int resX = 720;//1280;
-		try{
-			resX = Integer.parseInt(sres);
-		}catch(NumberFormatException e){
-			e.printStackTrace();
-		}
-		
-		String svbitrate = settings.getString("HRVbitrate", "700");
-		int vbitrate = 700;//1000;
-		try{
-			vbitrate = Integer.parseInt(svbitrate);
-		}catch(NumberFormatException e){
-			e.printStackTrace();
-		}
-		
-		String sabitrate = settings.getString("audio_bitrate", "64");
-		int abitrate = 64;//128;
-		try{
-			abitrate = Integer.parseInt(sabitrate);
-		}catch(NumberFormatException e){
-			e.printStackTrace();
-		}
+		int resX = parseIntOrDefault(sres, 720);
 
+		String svbitrate = settings.getString("HRVbitrate", "700");
+		int vbitrate = parseIntOrDefault(svbitrate, 700);
+
+		String sabitrate = settings.getString("audio_bitrate", "64");
+		int abitrate = parseIntOrDefault(sabitrate, 64);
 
 		String s_serverType = settings.getString("serverType", "1");
-		int server_type = 1;// publish RTMP
-		try{
-			server_type = Integer.parseInt(s_serverType);
-		}catch(NumberFormatException e){
-			e.printStackTrace();
-		}
+		int server_type = parseIntOrDefault(s_serverType, 1);// publish RTMP
 
 		// RTSP server audio only mode
 		boolean is_rtsp = false;
@@ -667,12 +654,9 @@ public class MainActivity extends Activity implements MediaCaptureCallback
 		config.setVideoKeyFrameInterval(1);
 		config.setVideoBitrate(vbitrate);
 
-		int bitrateMode = MediaCaptureConfig.BITRATE_MODE_ADAPTIVE;
-		try{
-			bitrateMode = Integer.parseInt(settings.getString("bitrateMode", ""+MediaCaptureConfig.BITRATE_MODE_ADAPTIVE));
-		}catch(NumberFormatException e){
-			e.printStackTrace();
-		}
+		int bitrateMode = parseIntOrDefault(
+				settings.getString("bitrateMode", ""+MediaCaptureConfig.BITRATE_MODE_ADAPTIVE),
+				MediaCaptureConfig.BITRATE_MODE_ADAPTIVE);
 		config.setVideoBitrateMode(bitrateMode);
 		config.setVideoSecBitrateMode(bitrateMode);
 		if(bitrateMode == MediaCaptureConfig.BITRATE_MODE_ADAPTIVE){

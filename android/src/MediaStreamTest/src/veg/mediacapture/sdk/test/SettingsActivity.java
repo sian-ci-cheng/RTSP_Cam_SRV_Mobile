@@ -217,16 +217,18 @@ public class SettingsActivity extends PreferenceActivity {
 		finish();
 	}
 
-	public String getServerType(String str){
-		
-		int val = 1;
+	private static int parseIntOrDefault(String s, int def){
 		try{
-			val = Integer.parseInt(str);
-		}
-		catch(NumberFormatException e){
+			return Integer.parseInt(s);
+		}catch(NumberFormatException e){
 			e.printStackTrace();
+			return def;
 		}
-		
+	}
+
+	public String getServerType(String str){
+		int val = parseIntOrDefault(str, 1);
+
 		String s="";
 		switch( val ){
 		case 1:
@@ -241,15 +243,8 @@ public class SettingsActivity extends PreferenceActivity {
 
 
 	public String getSRes(String str){
-		
-		int val = 1280;
-		try{
-			val = Integer.parseInt(str);
-		}
-		catch(NumberFormatException e){
-			e.printStackTrace();
-		}
-		
+		int val = parseIntOrDefault(str, 1280);
+
 		String s="";
 		switch( val ){
 		case 3840:
@@ -263,6 +258,7 @@ public class SettingsActivity extends PreferenceActivity {
 			break;
 		case 721:
 			s = "720x576";
+			break;
 		case 720:
 			s = "720x480";
 			break;
@@ -283,13 +279,7 @@ public class SettingsActivity extends PreferenceActivity {
 	}
 
 	public String getSBitrateMode(String str){
-		int val = -1;
-		try{
-			val = Integer.parseInt(str);
-		}
-		catch(NumberFormatException e){
-			e.printStackTrace();
-		}
+		int val = parseIntOrDefault(str, -1);
 
 		String s="ABR";
 		switch(val){
