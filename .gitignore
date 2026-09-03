@@ -1,0 +1,7 @@
+.DS_Store
+
+# iOS build artifacts / user-specific IDE state
+ios/RTSPCameraServer/dist/
+ios/RTSPCameraServer/RTSPCameraServer.xcodeproj/xcuserdata/
+ios/RTSPCameraServer/RTSPCameraServer.xcodeproj/project.xcworkspace/xcuserdata/
+ios/RTSPCameraServer/RTSPCameraServer.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
