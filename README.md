@@ -2,7 +2,7 @@
 
 A simple server for RTSP video streaming from a mobile device's camera over the local network — Android and iOS.
 
-## Android ([src/](src/))
+## Android ([android/src/](android/src/))
 
 The original app. Key features:
 
@@ -12,7 +12,7 @@ The original app. Key features:
 * Low latency for network stream – special API to control encoder latency.
 * AAC and G.711 audio codecs
 
-See [scripts/build_and_deploy.sh](scripts/build_and_deploy.sh) to build and install it on a connected device.
+See [android/scripts/build_and_deploy.sh](android/scripts/build_and_deploy.sh) to build and install it on a connected device.
 
 ## iOS ([ios/RTSPCameraServer/](ios/RTSPCameraServer/))
 
