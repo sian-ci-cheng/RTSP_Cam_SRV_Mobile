@@ -11,9 +11,9 @@
 # available.
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-GRADLE_PROJECT_DIR="$REPO_ROOT/src"
-PREBUILT_APK="$REPO_ROOT/bin/MediaStreamTest.apk"
+ANDROID_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+GRADLE_PROJECT_DIR="$ANDROID_ROOT/src"
+PREBUILT_APK="$ANDROID_ROOT/bin/MediaStreamTest.apk"
 PACKAGE_NAME="veg.mediacapture.sdk.test.demo"
 MAIN_ACTIVITY="veg.mediacapture.sdk.test.MainActivity"
 
