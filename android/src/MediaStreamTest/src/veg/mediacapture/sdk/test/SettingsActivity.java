@@ -34,15 +34,11 @@ public class SettingsActivity extends PreferenceActivity {
 	CheckBoxPreference record_capture_screen = null;
 	ListPreference record_audioBitrate = null;
 	CheckBoxPreference record_enable = null;
-	//CheckBoxPreference transcode_enable = null;
 	ListPreference  server_mode = null;
 	CheckBoxPreference secvideo_enable = null;
-	
-	//Preference streaming_urlrtmp = null;
-	//Preference streaming_urlipport = null;
+
 	Preference streaming_login = null;
 	Preference streaming_urlch = null;
-	//Preference streaming_urlpasscode = null;
 	Preference streaming_port = null;
 	
 
@@ -160,13 +156,8 @@ public class SettingsActivity extends PreferenceActivity {
 
 
 	void update_streaming_rtmp_enable(boolean isenabled){
-		//streaming_urlrtmp.setEnabled(isenabled);
-		//streaming_urlipport.setEnabled(isenabled);
 		streaming_login.setEnabled(isenabled);
 		streaming_urlch.setEnabled(isenabled);
-		//streaming_urlpasscode.setEnabled(isenabled);
-		//secvideo_enable.setEnabled(!isenabled);
-		//record_enable.setEnabled(isenabled);
 		streaming_port.setEnabled(!isenabled);
 	}
 
@@ -382,8 +373,7 @@ public class SettingsActivity extends PreferenceActivity {
 		record_videoRes.setSummary(getSRes(record_videoRes.getValue()));
 		
 		record_enable = (CheckBoxPreference) findPreference("record_enable");
-		//transcode_enable = (CheckBoxPreference) findPreference("transcode_enable");
-		
+
 		secvideo_enable = (CheckBoxPreference) findPreference("secvideo_enable");
 		
 		record_audio_enable = (CheckBoxPreference) findPreference("audio_enable");
@@ -401,15 +391,6 @@ public class SettingsActivity extends PreferenceActivity {
 		update_record_capture_screen(iscaptureScreen);
 
 
-		/*streaming_urlrtmp = findPreference("urlrtmp");
-		String surlrtmp = settings.getString("urlrtmp", "rtmp://54.173.34.172:1937/publish_demo/abc");
-		 
-		streaming_urlrtmp.setSummary(surlrtmp);*/
-		
-		/*streaming_urlipport = findPreference("urlipport");
-		String surlipport = settings.getString("urlipport", "52.89.212.138");
-		streaming_urlipport.setSummary(surlipport);*/
-
 		streaming_login = findPreference("login");
 		String slogin = settings.getString("login", "demo");
 		streaming_login.setSummary(slogin);
@@ -417,11 +398,7 @@ public class SettingsActivity extends PreferenceActivity {
 		streaming_urlch = findPreference("urlch");
 		String surlch = settings.getString("urlch", "0");
 		streaming_urlch.setSummary(surlch);
-		
-		/*streaming_urlpasscode = findPreference("urlpasscode");
-		String surlpasscode = settings.getString("urlpasscode", "0000");
-		streaming_urlpasscode.setSummary(surlpasscode);*/
-		
+
 		streaming_port = findPreference("urlport");
 		String surlport = settings.getString("urlport", "5540");
 		streaming_port.setSummary(surlport);
@@ -445,21 +422,6 @@ public class SettingsActivity extends PreferenceActivity {
 			
 		});
 		
-		/*streaming_urlrtmp.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
-			public boolean onPreferenceChange(Preference preference, Object newValue) {
-				preference.setSummary((String)newValue);
-				set_streaming_changed();
-				return true;
-			}
-		});*/
-		/*streaming_urlipport.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
-			public boolean onPreferenceChange(Preference preference, Object newValue) {
-				preference.setSummary((String)newValue);
-				set_streaming_changed();
-				return true;
-			}
-		});*/
-
 		streaming_serverType.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
 			public boolean onPreferenceChange(Preference preference, Object newValue) {
 				preference.setSummary(getServerType(newValue.toString()));
@@ -484,13 +446,6 @@ public class SettingsActivity extends PreferenceActivity {
 				return true;
 			}
 		});
-		/*streaming_urlpasscode.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
-			public boolean onPreferenceChange(Preference preference, Object newValue) {
-				preference.setSummary((String)newValue);
-				set_streaming_changed();
-				return true;
-			}
-		});*/
 		streaming_port.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
 			public boolean onPreferenceChange(Preference preference, Object newValue) {
 				preference.setSummary((String)newValue);
@@ -510,13 +465,6 @@ public class SettingsActivity extends PreferenceActivity {
 				return true;
 			}
 		});
-		/*transcode_enable.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
-			public boolean onPreferenceChange(Preference preference, Object newValue) {
-				set_record_changed();
-				return true;
-			}
-		});*/
-
 		record_audio_enable.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
 			public boolean onPreferenceChange(Preference preference, Object newValue) {
 				Boolean isenable = (Boolean)newValue;
