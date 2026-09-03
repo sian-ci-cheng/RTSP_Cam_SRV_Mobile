@@ -51,14 +51,10 @@ import veg.mediacapture.sdk.MediaCaptureConfig.CaptureVideoResolution;
 import veg.mediacapture.sdk.test.demo.R;
 
 import android.graphics.Bitmap;
-import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import android.os.Looper;
 import java.io.BufferedOutputStream;
 import android.graphics.Matrix;
-import android.os.Build;
-import android.Manifest;
 
 
 public class MainActivity extends Activity implements MediaCaptureCallback
@@ -294,8 +290,8 @@ public class MainActivity extends Activity implements MediaCaptureCallback
             return 0;
         }
 
-		mJPEG_file = getRecordPath()+"/preview_"+pts+".jpg";
-        File filePreview = new File(getRecordPath(), "preview_"+pts+".jpg");
+		mJPEG_file = spath+"/preview_"+pts+".jpg";
+        File filePreview = new File(spath, "preview_"+pts+".jpg");
         Log.e(TAG, "=OnCaptureReceiveData, filePreview " + filePreview.getAbsolutePath());
         if(filePreview.exists()){
             //Log.e(TAG, "=OnCaptureReceiveData, preview already exists");
@@ -313,30 +309,6 @@ public class MainActivity extends Activity implements MediaCaptureCallback
         Log.i(TAG, "=OnCaptureReceiveData, Image height " + height);
 
         // Prepare image
-        /*try {
-            Bitmap bm = Bitmap.createBitmap(
-                    width,
-                    height,
-                    Bitmap.Config.ARGB_8888
-            );
-            buffer.rewind();
-            bm.copyPixelsFromBuffer(buffer);
-
-            ByteArrayOutputStream fOut = new ByteArrayOutputStream();
-            bm.compress(Bitmap.CompressFormat.JPEG, 100, fOut);
-
-            FileOutputStream filePreviewOutputStream = new FileOutputStream(filePreview);
-            filePreviewOutputStream.write(fOut.toByteArray());
-            filePreviewOutputStream.flush();
-            filePreviewOutputStream.close();
-            fOut.flush();
-            fOut.close();
-            File filePreviewCrop = new File(spath, "preview.jpg");
-			//mJPEG_ready = true;
-
-        } catch (IOException e) {
-            Log.e(TAG, "=OnCaptureReceiveData ", e);
-        }*/
 		BufferedOutputStream bos = null;
 		try {
 			bos = new BufferedOutputStream(new FileOutputStream(filePreview));
