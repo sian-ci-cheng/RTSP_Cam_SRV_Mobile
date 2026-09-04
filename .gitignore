@@ -5,3 +5,8 @@ ios/RTSPCameraServer/dist/
 ios/RTSPCameraServer/RTSPCameraServer.xcodeproj/xcuserdata/
 ios/RTSPCameraServer/RTSPCameraServer.xcodeproj/project.xcworkspace/xcuserdata/
 ios/RTSPCameraServer/RTSPCameraServer.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+
+# Android build artifacts (Gradle cache/output, not source)
+android/src/.gradle/
+android/src/MediaStreamTest_astudio/build/
+android/src/*/build/

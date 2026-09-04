@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="veg.mediacapture.sdk.test.demo"
     android:versionCode="14"
     android:versionName="1.8.0"
     android:installLocation="auto" >
@@ -10,11 +9,11 @@
         android:icon="@drawable/app"
         android:label="@string/app_short_name"
         android:largeHeap="true"
-        android:launchMode="singleInstance" 
-        android:noHistory="true"
+        android:launchMode="singleInstance"
         android:configChanges="orientation|screenSize"
         >
-        <activity android:name="veg.mediacapture.sdk.test.MainActivity" >
+        <activity android:name="veg.mediacapture.sdk.test.MainActivity"
+            android:exported="true" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
@@ -27,16 +26,15 @@
         </activity>
     </application>
 
-	<uses-sdk
-	        android:minSdkVersion="17"
-	        android:targetSdkVersion="18"/>
-	
     <uses-feature android:name="android.hardware.camera" />
     <uses-feature android:name="android.hardware.camera.autofocus" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 
 	<uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-		
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
@@ -44,5 +42,6 @@
     <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     
 </manifest>

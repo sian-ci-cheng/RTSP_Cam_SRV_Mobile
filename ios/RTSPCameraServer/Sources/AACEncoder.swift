@@ -8,6 +8,9 @@ final class AACEncoder {
         /// One raw AAC access unit (no ADTS header) — RTP payload per RFC 3640.
         let data: Data
         let presentationTimeStamp: CMTime
+        /// The same access unit wrapped as a CMSampleBuffer -- LocalRecorder passes this
+        /// straight to AVAssetWriter instead of re-deriving AudioSpecificConfig by hand.
+        let sampleBuffer: CMSampleBuffer
     }
 
     /// Fixed for AAC-LC; used by the SDP fmtp line and to advance the RTP audio clock per frame.
@@ -19,12 +22,26 @@ final class AACEncoder {
     /// Available once `start()` succeeds.
     private(set) var audioSpecificConfig: Data?
 
-    var onEncodedFrame: ((EncodedFrame) -> Void)?
+    /// Encoded access units fan out to every subscriber (RTSP server, local recorder)
+    /// independently, mirroring H264Encoder's listener list.
+    typealias Listener = (EncodedFrame) -> Void
+    private var listeners: [UUID: Listener] = [:]
 
     private var converter: AVAudioConverter?
     private var nativeFormat: AVAudioFormat?
     private var outputFormat: AVAudioFormat?
     private let queue = DispatchQueue(label: "AACEncoder.queue")
+
+    @discardableResult
+    func addListener(_ listener: @escaping Listener) -> UUID {
+        let id = UUID()
+        queue.sync { listeners[id] = listener }
+        return id
+    }
+
+    func removeListener(_ id: UUID) {
+        queue.sync { listeners.removeValue(forKey: id) }
+    }
 
     func start() {
         queue.sync {
@@ -85,7 +102,10 @@ final class AACEncoder {
 
             guard status == .haveData, conversionError == nil, outputBuffer.byteLength > 0 else { return }
             let data = Data(bytes: outputBuffer.data, count: Int(outputBuffer.byteLength))
-            self.onEncodedFrame?(EncodedFrame(data: data, presentationTimeStamp: pts))
+            guard let sampleBuffer = Self.makeSampleBuffer(from: outputBuffer, formatDescription: outputFormat.formatDescription, presentationTimeStamp: pts) else { return }
+            let frame = EncodedFrame(data: data, presentationTimeStamp: pts, sampleBuffer: sampleBuffer)
+            // Already running on `queue` here, so this is safe without an extra lock/snapshot.
+            for listener in self.listeners.values { listener(frame) }
         }
     }
 
@@ -127,6 +147,52 @@ final class AACEncoder {
 
         let config: UInt16 = (objectType << 11) | (freqIndex << 7) | (channelConfig << 3)
         return Data([UInt8(config >> 8), UInt8(config & 0xFF)])
+    }
+
+    /// Wraps one compressed AAC access unit into a CMSampleBuffer via the CoreMedia API built
+    /// specifically for this (compressed audio + per-packet size, no fixed frame layout).
+    private static func makeSampleBuffer(from outputBuffer: AVAudioCompressedBuffer, formatDescription: CMFormatDescription, presentationTimeStamp: CMTime) -> CMSampleBuffer? {
+        let byteLength = Int(outputBuffer.byteLength)
+        guard byteLength > 0 else { return nil }
+
+        var blockBuffer: CMBlockBuffer?
+        let blockStatus = CMBlockBufferCreateWithMemoryBlock(
+            allocator: kCFAllocatorDefault,
+            memoryBlock: nil,
+            blockLength: byteLength,
+            blockAllocator: kCFAllocatorDefault,
+            customBlockSource: nil,
+            offsetToData: 0,
+            dataLength: byteLength,
+            flags: 0,
+            blockBufferOut: &blockBuffer
+        )
+        guard blockStatus == noErr, let blockBuffer else { return nil }
+
+        let copyStatus = CMBlockBufferReplaceDataBytes(with: outputBuffer.data, blockBuffer: blockBuffer, offsetIntoDestination: 0, dataLength: byteLength)
+        guard copyStatus == noErr else { return nil }
+
+        var packetDescription = AudioStreamPacketDescription(
+            mStartOffset: 0,
+            mVariableFramesInPacket: 0,
+            mDataByteSize: UInt32(byteLength)
+        )
+
+        var sampleBuffer: CMSampleBuffer?
+        let sbStatus = CMAudioSampleBufferCreateWithPacketDescriptions(
+            allocator: kCFAllocatorDefault,
+            dataBuffer: blockBuffer,
+            dataReady: true,
+            makeDataReadyCallback: nil,
+            refcon: nil,
+            formatDescription: formatDescription,
+            sampleCount: 1,
+            presentationTimeStamp: presentationTimeStamp,
+            packetDescriptions: &packetDescription,
+            sampleBufferOut: &sampleBuffer
+        )
+        guard sbStatus == noErr else { return nil }
+        return sampleBuffer
     }
 
     private static func samplingFrequencyIndex(for sampleRate: Double) -> UInt8 {

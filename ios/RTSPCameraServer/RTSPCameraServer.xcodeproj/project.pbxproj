@@ -7,24 +7,24 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		11AA22BB33CC44DD55EE66FF /* AudioCaptureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF66 /* AudioCaptureManager.swift */; };
-		FF00EE11DD22CC33BB44AA55 /* AACEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99887766554433221100AABB /* AACEncoder.swift */; };
 		362D67892016E97FEFD016A9 /* RTPPacketizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1252AB81FBF8CD0B74DD10A /* RTPPacketizer.swift */; };
 		3B9C0A12649B137738324C18 /* RTSPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B90DE1BC6F0705AEF8D6EED /* RTSPServer.swift */; };
 		48FD2FA325DC6C2F9D39D483 /* RTSPCameraServerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EE152BDD02483BBC21852EF /* RTSPCameraServerApp.swift */; };
 		4D960E8FFE08C48F97CEE133 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03271DCE53F025A75E3EF31C /* ContentView.swift */; };
 		7F88EBE0C7B07073B0386A7F /* StreamResolution.swift in Sources */ = {isa = PBXBuildFile; fileRef = 002AAADAD593F2DCEF83A671 /* StreamResolution.swift */; };
+		88661298319CA6119BF7E02D /* AudioCaptureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF8E6C22E0B6D4EB494C9E5A /* AudioCaptureManager.swift */; };
 		88CABBF820D656C297AB3492 /* NetworkUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E1D0DF3E8B4309503DC1848 /* NetworkUtils.swift */; };
+		B23F0DAC5C22B0E4B1EAAF2D /* LocalRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FB3A75720E2EC933336468F /* LocalRecorder.swift */; };
 		B9617A6C33B542F69049B3D6 /* CameraCaptureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1312B5247B9A3239CFDBCD5C /* CameraCaptureManager.swift */; };
 		C60EEAA8EEE6E6E6265443E7 /* H264Encoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BCF4757439BB32A27135341 /* H264Encoder.swift */; };
 		EDD61A05122C65B6AA829FDB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 60FC3D9A2D0612C723F53D29 /* Assets.xcassets */; };
+		FFD56F4C06ED41BFA97AA724 /* AACEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4DC5213185AC20743964C84 /* AACEncoder.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		AA11BB22CC33DD44EE55FF66 /* AudioCaptureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCaptureManager.swift; sourceTree = "<group>"; };
-		99887766554433221100AABB /* AACEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AACEncoder.swift; sourceTree = "<group>"; };
 		002AAADAD593F2DCEF83A671 /* StreamResolution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamResolution.swift; sourceTree = "<group>"; };
 		03271DCE53F025A75E3EF31C /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		0FB3A75720E2EC933336468F /* LocalRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalRecorder.swift; sourceTree = "<group>"; };
 		1312B5247B9A3239CFDBCD5C /* CameraCaptureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraCaptureManager.swift; sourceTree = "<group>"; };
 		5BCF4757439BB32A27135341 /* H264Encoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = H264Encoder.swift; sourceTree = "<group>"; };
 		5E1D0DF3E8B4309503DC1848 /* NetworkUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkUtils.swift; sourceTree = "<group>"; };
@@ -32,21 +32,24 @@
 		6B90DE1BC6F0705AEF8D6EED /* RTSPServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RTSPServer.swift; sourceTree = "<group>"; };
 		7EE152BDD02483BBC21852EF /* RTSPCameraServerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RTSPCameraServerApp.swift; sourceTree = "<group>"; };
 		A38A351C09D3F07707B2BFC4 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		AF8E6C22E0B6D4EB494C9E5A /* AudioCaptureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCaptureManager.swift; sourceTree = "<group>"; };
 		C1252AB81FBF8CD0B74DD10A /* RTPPacketizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RTPPacketizer.swift; sourceTree = "<group>"; };
-		EEEC0C2B95426145F2A92A49 /* RTSPCameraServer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RTSPCameraServer.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E4DC5213185AC20743964C84 /* AACEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AACEncoder.swift; sourceTree = "<group>"; };
+		EEEC0C2B95426145F2A92A49 /* RTSPCameraServer.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = RTSPCameraServer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
 		551AC244F05BF35CD40D1F44 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
-				99887766554433221100AABB /* AACEncoder.swift */,
+				E4DC5213185AC20743964C84 /* AACEncoder.swift */,
 				60FC3D9A2D0612C723F53D29 /* Assets.xcassets */,
-				AA11BB22CC33DD44EE55FF66 /* AudioCaptureManager.swift */,
+				AF8E6C22E0B6D4EB494C9E5A /* AudioCaptureManager.swift */,
 				1312B5247B9A3239CFDBCD5C /* CameraCaptureManager.swift */,
 				03271DCE53F025A75E3EF31C /* ContentView.swift */,
 				5BCF4757439BB32A27135341 /* H264Encoder.swift */,
 				A38A351C09D3F07707B2BFC4 /* Info.plist */,
+				0FB3A75720E2EC933336468F /* LocalRecorder.swift */,
 				5E1D0DF3E8B4309503DC1848 /* NetworkUtils.swift */,
 				C1252AB81FBF8CD0B74DD10A /* RTPPacketizer.swift */,
 				7EE152BDD02483BBC21852EF /* RTSPCameraServerApp.swift */,
@@ -103,6 +106,7 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					286F71C89AC312082ECD7508 = {
+						DevelopmentTeam = Z282G33Q4X;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -142,11 +146,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				FF00EE11DD22CC33BB44AA55 /* AACEncoder.swift in Sources */,
-				11AA22BB33CC44DD55EE66FF /* AudioCaptureManager.swift in Sources */,
+				FFD56F4C06ED41BFA97AA724 /* AACEncoder.swift in Sources */,
+				88661298319CA6119BF7E02D /* AudioCaptureManager.swift in Sources */,
 				B9617A6C33B542F69049B3D6 /* CameraCaptureManager.swift in Sources */,
 				4D960E8FFE08C48F97CEE133 /* ContentView.swift in Sources */,
 				C60EEAA8EEE6E6E6265443E7 /* H264Encoder.swift in Sources */,
+				B23F0DAC5C22B0E4B1EAAF2D /* LocalRecorder.swift in Sources */,
 				88CABBF820D656C297AB3492 /* NetworkUtils.swift in Sources */,
 				362D67892016E97FEFD016A9 /* RTPPacketizer.swift in Sources */,
 				48FD2FA325DC6C2F9D39D483 /* RTSPCameraServerApp.swift in Sources */,
@@ -281,7 +286,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 944B8ZC6P2;
+				DEVELOPMENT_TEAM = Z282G33Q4X;
 				INFOPLIST_FILE = Sources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -301,7 +306,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = 944B8ZC6P2;
+				DEVELOPMENT_TEAM = Z282G33Q4X;
 				INFOPLIST_FILE = Sources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (

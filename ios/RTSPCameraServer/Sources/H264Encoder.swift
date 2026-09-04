@@ -4,21 +4,39 @@ import VideoToolbox
 /// Wraps VTCompressionSession to turn camera frames into H.264 NAL units in real time.
 final class H264Encoder {
     struct EncodedFrame {
-        /// Individual NAL units (no start code / length prefix), in decode order.
+        /// Individual NAL units (no start code / length prefix), in decode order -- used for RTP.
         let nalUnits: [Data]
         let presentationTimeStamp: CMTime
         let isKeyFrame: Bool
+        /// The original VideoToolbox output sample buffer (AVCC-formatted, with its own format
+        /// description carrying SPS/PPS) -- LocalRecorder passes this straight to AVAssetWriter
+        /// unmodified instead of reconstructing it from nalUnits.
+        let sampleBuffer: CMSampleBuffer
     }
 
     /// SPS/PPS become available once the encoder produces its first frame.
     private(set) var sps: Data?
     private(set) var pps: Data?
 
-    var onEncodedFrame: ((EncodedFrame) -> Void)?
+    /// Encoded access units fan out to every subscriber (RTSP server, local recorder)
+    /// independently -- none of them reach back into this encoder or the camera.
+    typealias Listener = (EncodedFrame) -> Void
+    private var listeners: [UUID: Listener] = [:]
     var onParameterSetsReady: (() -> Void)?
 
     private var session: VTCompressionSession?
     private let queue = DispatchQueue(label: "H264Encoder.queue")
+
+    @discardableResult
+    func addListener(_ listener: @escaping Listener) -> UUID {
+        let id = UUID()
+        queue.sync { listeners[id] = listener }
+        return id
+    }
+
+    func removeListener(_ id: UUID) {
+        queue.sync { listeners.removeValue(forKey: id) }
+    }
 
     func start(width: Int32, height: Int32, bitrate: Int32 = 4_000_000, fps: Int32 = 30) {
         queue.sync {
@@ -125,9 +143,14 @@ final class H264Encoder {
         let frame = EncodedFrame(
             nalUnits: nalUnits,
             presentationTimeStamp: CMSampleBufferGetPresentationTimeStamp(sampleBuffer),
-            isKeyFrame: isKeyFrame
+            isKeyFrame: isKeyFrame,
+            sampleBuffer: sampleBuffer
         )
-        onEncodedFrame?(frame)
+        // VTCompressionSession's completion callback can run on an internal VideoToolbox thread,
+        // not necessarily `queue` -- snapshot the listener list under the lock, then invoke
+        // outside it so a listener can't block out addListener/removeListener.
+        let currentListeners = queue.sync { Array(listeners.values) }
+        for listener in currentListeners { listener(frame) }
     }
 
     private func extractParameterSets(from formatDescription: CMFormatDescription) {

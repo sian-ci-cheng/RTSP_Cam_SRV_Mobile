@@ -7,6 +7,7 @@
 
 package veg.mediacapture.sdk.test;
 
+import android.Manifest;
 import android.app.ActionBar;
 import android.app.Activity;
 import android.content.Context;
@@ -14,12 +15,10 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.Editor;
 import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiManager.MulticastLock;
 import android.os.Bundle;
-import android.os.Environment;
-import android.os.Handler;
-import android.os.Message;
 import android.os.PowerManager;
 import android.preference.PreferenceManager;
 import android.util.Log;
@@ -28,51 +27,27 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.Window;
+import android.view.TextureView;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.File;
-import java.nio.ByteBuffer;
-import java.util.List;
-
-import veg.mediacapture.sdk.MediaCapture;
-import veg.mediacapture.sdk.MediaCapture.CaptureNotifyCodes;
-import veg.mediacapture.sdk.MediaCapture.CaptureState;
-import veg.mediacapture.sdk.MediaCapture.PlayerRecordFlags;
-import veg.mediacapture.sdk.MediaCapture.PlayerRecordStat;
-import veg.mediacapture.sdk.MediaCaptureCallback;
-import veg.mediacapture.sdk.MediaCaptureConfig;
-import veg.mediacapture.sdk.MediaCaptureConfig.CaptureModes;
-import veg.mediacapture.sdk.MediaCaptureConfig.CaptureVideoResolution;
 import veg.mediacapture.sdk.test.demo.R;
-
-import android.graphics.Bitmap;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.BufferedOutputStream;
-import android.graphics.Matrix;
+import veg.mediacapture.sdk.test.rtspserver.CameraStreamer;
 
 
-public class MainActivity extends Activity implements MediaCaptureCallback
+public class MainActivity extends Activity
 {
     private static final String TAG 	 = "MediaCaptureTest";
-    
-    private static final boolean TEST_SEPARATED_CONTROL = false;
-	private static final boolean USE_PORTRAIT_MODE = false;
 
-	private static final boolean GET_JPEG_ON_START = false;
-    
+	private static final boolean USE_PORTRAIT_MODE = false;
+	private static final int CAMERA_PERMISSION_REQUEST = 1001;
+
     private SharedPreferences settings=null;
-    
-    private MediaCapture 				capturer = null;
-    private boolean 					misAudioEnabled=true;
-    private boolean						misSurfaceCreated = false;
-	private boolean						USE_RTSP_G711=false;
-    
-    private boolean 					misRecfileEnabled=true;
-    private boolean 					misTranscodingEnabled=true;
+
+    private CameraStreamer				streamer = null;
+    private boolean						misStreaming = false;
 
 	private ImageView led;
     private TextView 					captureStatusText = null;
@@ -80,290 +55,32 @@ public class MainActivity extends Activity implements MediaCaptureCallback
     private TextView					captureStatusStat = null;
     private ImageButton					mbuttonRec = null;
     private ImageButton 				mbuttonSettings = null;
-    
-    String rtmp_url = "";
-    
+    private TextureView					captureView = null;
+
     private MulticastLock multicastLock = null;
     private PowerManager.WakeLock mWakeLock;
-    
-	private CaptureState capture_state = CaptureState.Closed;
 
-	private Toast toastShot = null;
-	
 	public static MainActivity sMainActivity;
-	public MediaCaptureConfig mConfig;
 
-	boolean mJPEG_ready = false;
-	String  mJPEG_file = "";
-	
-	// Event handler
-	
-	private Handler handler = new Handler() 
-    {
-		@Override
-	    public void handleMessage(Message msg) 
-	    {
-	    	CaptureNotifyCodes status = (CaptureNotifyCodes) msg.obj;
-    		//Log.i(TAG, "=Status handleMessage status="+status);
+	private int mVideoWidth = 1280;
+	private int mVideoHeight = 720;
+	private int mVideoBitrateKbps = 700;
+	private int mRtspPort = 5540;
+	private boolean mAudioEnabled = true;
+	private int mAudioBitrateKbps = 64;
+	private boolean mRecordEnabled = false;
+	private boolean mSecondaryEnabled = true;
+	private boolean mGpsEnabled = true;
+	private long mGpsUpdateIntervalMs = 1000;
 
-    		String strText = null;
-
-	        switch (status) 
-	        {
-	        	case CAP_OPENED:
-	        		strText = "Opened";
-	        		break;
-	        	case CAP_SURFACE_CREATED:
-	        		strText = "Camera surface created surfaceView="+capturer.getSurfaceView();
-	        		misSurfaceCreated = true;
-	        		break;
-	        	case CAP_SURFACE_DESTROYED:
-	        		strText = "Camera surface destroyed";
-	        		misSurfaceCreated = false;
-	        		break;
-	        	case CAP_STARTED:
-	        		strText = "Started";
-	        		break;
-	        	case CAP_STOPPED:
-	        		strText = "Stopped";
-	        		break;
-	        	case CAP_CLOSED:
-	        		strText = "Closed";
-	        		break;
-	        	case CAP_ERROR:
-	        		strText = "Error";
-	        		//break;
-	        	case CAP_TIME:
-	        		
-					 if(isRec()){
-			        	int rtmp_status = capturer.getStreamStatus();
-			        	int dur = (int)(long)capturer.getDuration()/1000;
-			        	int v_cnt = capturer.getVideoPackets();
-			        	int a_cnt = capturer.getAudioPackets();
-			        	long v_pts = capturer.getLastVideoPTS();
-			        	long a_pts = capturer.getLastAudioPTS();
-			        	int nreconnects = capturer.getStatReconnectCount();
-						long actual_bitrate = capturer.getPropLong(PlayerRecordStat.forType(PlayerRecordStat.PP_RECORD_STAT_ACTUAL_BITRATE));
-						long actual_framerate = capturer.getPropLong(PlayerRecordStat.forType(PlayerRecordStat.PP_RECORD_STAT_ACTUAL_FRAMERATE));
-
-						 String sss = "";
-						 String sss2 = "";
-						 int min = dur/60;
-						 int sec = dur- (min*60);
-						 sss = String.format("%02d:%02d", min, sec);
-						 if(!misAudioEnabled)
-							 sss += ". Audio OFF";
-						 if(rtmp_status == (-999)){
-							 sss = "Streaming stopped. DEMO VERSION limitation";
-							 stopOnDemoLimitReached();
-						 }else
-						 if(rtmp_status != (-1)){
-
-							 if(capturer.USE_RTSP_SERVER){
-							 	sss += ". RTSP ON ("+ capturer.getRTSPAddr()+")";
-								sss2 += "v:"+v_cnt+" a:"+a_cnt+" rcc:"+nreconnects;
-							 }else{
-							 sss += ". RTMP "+ ((rtmp_status == 0)?"ON ( "+rtmp_url+" )":"Err:"+rtmp_status);
-							 //sss += ". RTMP "+ ((rtmp_status == 0)?"ON ":"Err:"+rtmp_status);
-							 if(rtmp_status == (-5)){
-								 sss += " Server not connected ( "+rtmp_url+" )";
-							 }else if(rtmp_status == (-12)){
-								 sss += " Out of memory";
-							 }
-							 sss2 += "v:"+v_cnt+" a:"+a_cnt+" rcc:"+nreconnects+"  "+actual_bitrate+"kbps : "+actual_framerate+"fps";
-							 sss2 += "\nv_pts: "+v_pts+" a_pts: "+a_pts+" delta: "+(v_pts-a_pts);
-							 }
-							 
-						 }else{
-							// rtmp_status == (-1)
-							 sss += ". Connecting ...";
-						 }
-
-						 String sss3 = "";
-						 int rec_status = capturer.getRECStatus();
-						 if(rec_status != -1){
-						 	if(rec_status == (-999)){
-								sss = "Streaming stopped. DEMO VERSION limitation";
-								stopOnDemoLimitReached();
-						 	}else
-						 	if(rec_status != 0 && rec_status != (-999)){
-								sss3 += "REC Err:"+rec_status;
-						 	}else
-						 		sss3 += "REC ON. "+capturer.getPropString(PlayerRecordStat.forType(PlayerRecordStat.PP_RECORD_STAT_FILE_NAME));
-						 }
-						 
-						 captureStatusText.setText(sss);
-						 captureStatusStat.setText(sss2);
-						 captureStatusText2.setText(sss3);
-					 }
-	        		break;
-
-	            default:
-	            	break;
-	        }
-	        if(strText != null){
-	        	Log.i(TAG, "=Status handleMessage str="+strText);
-	        }
-	    }
-	};
-
-	// All event are sent to event handlers
 	@Override
-	public int OnCaptureStatus(int arg) {
-		CaptureNotifyCodes status = CaptureNotifyCodes.forValue(arg);
-		if (handler == null || status == null)
-			return 0;
-
-		//Log.v(TAG, "=OnCaptureStatus status=" + arg);
-	    switch (CaptureNotifyCodes.forValue(arg))
-	    {
-	        default:
-				Message msg = new Message();
-				msg.obj = status;
-				handler.removeMessages(msg.what);
-				handler.sendMessage(msg);
-	    }
-
-		return 0;
-	}
-
-	private void StartJPEG(){
-		mJPEG_ready = false;
-		runOnUiThread(new Runnable()
-        {
-           @Override
-           public void run(){
-			   capturer.StartTranscoding();
-           }
-        });
-	}
-
-	private void StopJPEG(){
-		mJPEG_ready = true;
-		runOnUiThread(new Runnable()
-        {
-           @Override
-           public void run(){
-			   File filePreview = new File(mJPEG_file);
-			   if(filePreview.exists()){
-				   Toast.makeText(MainActivity.sMainActivity, "JPEG file ready="+filePreview.getAbsolutePath(), Toast.LENGTH_LONG).show();
-			   }
-			   capturer.StopTranscoding();
-           }
-        });
-	}
-
-	// callback from Native Capturer 
-	@Override
-	public int OnCaptureReceiveData(ByteBuffer buffer, int type, int size,
-			long pts) {
-		
-		Log.v(TAG, "=OnCaptureReceiveData buffer="+buffer+" type="+type+" size="+size+" pts="+pts);
-
-		
-        if (mJPEG_ready) {
-            return 0;
-        }
-
-        if (buffer == null){
-            Log.e(TAG, "=OnCaptureReceiveData, buffer is null");
-            return 0;
-        }
-
-        if(type != 0){ // not video frame
-            Log.e(TAG, "=OnCaptureReceiveData, it's not video frame");
-            return 0;
-        }
-
-		String spath = getRecordPath();
-        if(spath.isEmpty()){
-            Log.e(TAG, "=OnCaptureReceiveData spath is empty");
-            StopJPEG();
-            return 0;
-        }
-
-		mJPEG_file = spath+"/preview_"+pts+".jpg";
-        File filePreview = new File(spath, "preview_"+pts+".jpg");
-        Log.e(TAG, "=OnCaptureReceiveData, filePreview " + filePreview.getAbsolutePath());
-        if(filePreview.exists()){
-            //Log.e(TAG, "=OnCaptureReceiveData, preview already exists");
-            //StopTranscoding();
-            //return 0;
-            filePreview.delete();
-        }
-
-		int width = capturer.getConfig().getTransWidth(); //320;
-		int height = capturer.getConfig().getTransHeight(); //240;
-        Log.v(TAG, "=OnCaptureReceiveData, buffer="+buffer+" type="+type+" size="+size+" pts="+pts);
-        Log.i(TAG, "=OnCaptureReceiveData, Send image buffer.capacity() " + buffer.capacity() );
-        Log.i(TAG, "=OnCaptureReceiveData, Send image buffer.capacity() expected " + (width* height*4) );
-        Log.i(TAG, "=OnCaptureReceiveData, Image width " + width);
-        Log.i(TAG, "=OnCaptureReceiveData, Image height " + height);
-
-        // Prepare image
-		BufferedOutputStream bos = null;
-		try {
-			bos = new BufferedOutputStream(new FileOutputStream(filePreview));
-			Bitmap bmp0 = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-			bmp0.copyPixelsFromBuffer(buffer);
-
-			Matrix matrix = new Matrix();
-			matrix.preScale(-1, 1);
-			matrix.preRotate(180);
-			//matrix.postScale(width, height);
-			//matrix.postRotate(180);
-			Bitmap bmp = Bitmap.createBitmap(bmp0, 0, 0,width, height, matrix, true);
-			
-			bmp.compress(Bitmap.CompressFormat.JPEG, 100, bos);
-			bmp0.recycle();
-			bmp.recycle();
-			if (bos != null) bos.close();
-		} catch (IOException e) {
-			Log.e(TAG, "=OnCaptureReceiveData ", e);
-		}
-			
-
-        Log.e(TAG, "=OnCaptureReceiveData end ");
-
-		StopJPEG();
-		return 0;
-	}
-
-	private boolean opened = false;
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode != MediaCapture.PERMISSION_CODE) {
-            //Toast.makeText(this, "Unknown request code: " + requestCode, Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if (resultCode != RESULT_OK) {
-            Toast.makeText(this, "Screen Cast Permission Denied", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        Log.i(TAG, "Get media projection with the new permission");
-
-		if (!opened) {
-			capturer.SetPermissionRequestResults(resultCode, data);
-			capturer.Open(null, this);
-			opened = true;
-		}
-    }
-
-
-    @Override
 	public void onCreate(Bundle savedInstanceState)
 	{
-		//MediaCapture.DISABLE_CAMERA = true;
-		String  strUrl;
-
 		setTitle(R.string.app_name);
 
 		super.onCreate(savedInstanceState);
 
 		sMainActivity = this;
-
-		//get library version
-		Log.v(TAG, "=>onCreate MediaCapture::getLibVersion()="+MediaCapture.getLibVersion());
 
 		// Prevents the phone to go to sleep mode
 		PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
@@ -379,20 +96,6 @@ public class MainActivity extends Activity implements MediaCaptureCallback
 		getWindow().setFeatureInt(Window.FEATURE_PROGRESS, Window.PROGRESS_VISIBILITY_ON);
 
 		settings = PreferenceManager.getDefaultSharedPreferences(this);
-		int intro_needed = settings.getInt("intro", 1);
-		if(intro_needed == 1){
-			//String androidID = android.provider.Settings.Secure.getString(getContentResolver(), android.provider.Settings.Secure.ANDROID_ID);
-			Editor ed = settings.edit();
-			String surlr = settings.getString("urlrtmp", "rtmp://54.173.34.172:1937/publish_demo/");
-			//surlr += androidID;
-			ed.putString("urlrtmp", surlr);
-			ed.putString("urlch", "0");
-			ed.putString("login", "demo");
-			//ed.putString("urlpasscode", "0000");
-			ed.putInt("intro", 0);
-			ed.apply();
-		}
-		intro_needed = 0;
 
 		setContentView(R.layout.main);
 
@@ -418,14 +121,26 @@ public class MainActivity extends Activity implements MediaCaptureCallback
 		captureStatusText2 = (TextView)findViewById(R.id.statusRec2);
 		captureStatusText2.setText("");
 
-		capturer = (MediaCapture)findViewById(R.id.captureView);
+		captureView = (TextureView)findViewById(R.id.captureView);
 
 		load_config();
 
-		capturer.RequestPermission(this);
+		streamer = new CameraStreamer(this);
+		streamer.statusListener = this::onStreamerStatus;
 
-		if (mConfig.getCaptureSource() != MediaCaptureConfig.CaptureSources.PP_MODE_VIRTUAL_DISPLAY.val())
-			capturer.Open(null, this);
+		java.util.List<String> missingPermissions = new java.util.ArrayList<>();
+		if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+			missingPermissions.add(Manifest.permission.CAMERA);
+		}
+		if (mAudioEnabled && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+			missingPermissions.add(Manifest.permission.RECORD_AUDIO);
+		}
+		if (mGpsEnabled && checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+			missingPermissions.add(Manifest.permission.ACCESS_FINE_LOCATION);
+		}
+		if (!missingPermissions.isEmpty()) {
+			requestPermissions(missingPermissions.toArray(new String[0]), CAMERA_PERMISSION_REQUEST);
+		}
 
         mbuttonSettings = (ImageButton) findViewById(R.id.imageButtonMenu);
 		mbuttonSettings.setSoundEffectsEnabled(false);
@@ -437,7 +152,7 @@ public class MainActivity extends Activity implements MediaCaptureCallback
 						if(isRec()){
 							Toast.makeText(MainActivity.sMainActivity,"Press 'Stop Streaming' button  first", Toast.LENGTH_LONG).show();
 						}else{
-							// Starts QualityListActivity where user can change the streaming quality
+							// Starts SettingsActivity where user can change the streaming quality
 							intent = new Intent(MainActivity.sMainActivity.getBaseContext(),SettingsActivity.class);
 							startActivity(intent);
 							finish();
@@ -452,79 +167,45 @@ public class MainActivity extends Activity implements MediaCaptureCallback
 				new View.OnClickListener() {
 					@Override
 					public void onClick(View v) {
-						if(capturer == null)
+						if(streamer == null)
 							return;
 						if( !isRec() ){
+							if (checkSelfPermission(Manifest.permission.CAMERA)
+									!= PackageManager.PERMISSION_GRANTED) {
+								Toast.makeText(MainActivity.sMainActivity,"Camera permission required", Toast.LENGTH_LONG).show();
+								return;
+							}
 
-							String sRecStatus = misAudioEnabled?"00:00":"00:00. Audio OFF";
-							captureStatusText.setText(sRecStatus);
+							captureStatusText.setText("Starting...");
 							captureStatusStat.setText("");
 							led.setImageResource(R.drawable.led_red);
 
-							if(!TEST_SEPARATED_CONTROL){
-								//all start
-								capturer.Start();
-
-								//test
-								//capturer.StopStreaming();
-								mbuttonRec.setImageResource(R.drawable.ic_stop);
-
-							}else{
-								//induvidual start test
-								capturer.StartStreaming();
-								mbuttonRec.setImageResource(R.drawable.ic_stop);
-
-								//start postponed rec
-								new Handler().postDelayed(new Runnable()
-								{
-										@Override
-									public void run()
-									  {
-											capturer.StartRecording();
-									  }
-								}, 10000);
-
-								//start postponed rec
-								new Handler().postDelayed(new Runnable()
-								{
-										@Override
-									public void run()
-									  {
-											capturer.StartTranscoding();
-									  }
-								}, 20000);
-
-							}
-
-							
-							if(GET_JPEG_ON_START){
-								StartJPEG();
-							}
-
-							//mbuttonRec.setText("Stop Streaming");
+							streamer.start(mVideoWidth, mVideoHeight, mVideoBitrateKbps, 30, mRtspPort,
+									mAudioEnabled, mAudioBitrateKbps, mRecordEnabled, mSecondaryEnabled,
+									mGpsEnabled, mGpsUpdateIntervalMs, captureView);
+							misStreaming = true;
+							mbuttonRec.setImageResource(R.drawable.ic_stop);
 						}else{
-							capturer.Stop();
+							streamer.stop();
+							misStreaming = false;
 							led.setImageResource(R.drawable.led_green);
 							captureStatusText.setText("");
 							captureStatusStat.setText("");
 							captureStatusText2.setText("");
 							mbuttonRec.setImageResource(R.drawable.ic_fiber_manual_record_red);
-							//mbuttonRec.setText("Start Streaming");
 						}
-
 					}
 				}
 			);
 	}
-    
+
 	public boolean isRec(){
-		return ( capturer != null && capturer.getState() == CaptureState.Started );
+		return misStreaming;
 	}
 
-	private void stopOnDemoLimitReached(){
-		capturer.Stop();
-		led.setImageResource(R.drawable.led_green);
-		mbuttonRec.setImageResource(R.drawable.ic_fiber_manual_record_red);
+	private void onStreamerStatus(String status){
+		Log.i(TAG, "=streamer status="+status);
+		captureStatusText.setText(status);
 	}
 
 	private static int parseIntOrDefault(String s, int def){
@@ -536,332 +217,118 @@ public class MainActivity extends Activity implements MediaCaptureCallback
 		}
 	}
 
-	public String getRecordPath()
-	{
-		File mediaStorageDir = new File(Environment.getExternalStoragePublicDirectory(
-				  Environment.DIRECTORY_DCIM), "RecordsMediaStreamer");
-
-		if (! mediaStorageDir.exists()){
-			if (!(mediaStorageDir.mkdirs() || mediaStorageDir.isDirectory())){
-				Log.e(TAG, "<=getRecordPath() failed to create directory path="+mediaStorageDir.getPath());
-				return "";
-			}
-		}
-		return mediaStorageDir.getPath();
-	}
-	
-	int get_record_flags()
-	{
-		int flags = PlayerRecordFlags.forType(PlayerRecordFlags.PP_RECORD_AUTO_START) | PlayerRecordFlags.forType(PlayerRecordFlags.PP_RECORD_SPLIT_BY_TIME);	// auto start and split by time
-		//int flags = PlayerRecordFlags.forType(PlayerRecordFlags.PP_RECORD_AUTO_START) | PlayerRecordFlags.forType(PlayerRecordFlags.PP_RECORD_SPLIT_BY_SIZE);	// auto start and split by size
-		return flags;
-	}
-
 	void load_config(){
-		if(capturer == null)
-			return;
-		
-		mConfig = capturer.getConfig();
-
-		int settings_changed = settings.getInt("streaming_changed", 1);
-		rtmp_url = ""+settings.getString("urlrtmp", "rtmp://54.173.34.172:1937/publish_demo/")+settings.getString("login", "demo")+settings.getString("urlch","0");
-		if(settings_changed == 1){
-			//rtmp_url = "rtmp://"+settings.getString("urlipport","")+"/live/ch"+settings.getString("urlch","0")+"?pass_code="+settings.getString("urlpasscode","0000");
-			
-			Editor ed = settings.edit();
-			//ed.putString("urlrtmp", rtmp_url);
-			ed.putInt("streaming_changed", 0);
-			ed.apply();
-		}else{
-			//rtmp_url = settings.getString("urlrtmp", "rtmp://54.173.34.172:1937/publish_demo/abc");
-		}
-    	
 		String sres = settings.getString("videoRes", "1280");
-		int resX = parseIntOrDefault(sres, 720);
+		mVideoWidth = parseIntOrDefault(sres, 1280);
+		mVideoHeight = mVideoWidth * 9 / 16;
 
 		String svbitrate = settings.getString("HRVbitrate", "700");
-		int vbitrate = parseIntOrDefault(svbitrate, 700);
+		mVideoBitrateKbps = parseIntOrDefault(svbitrate, 700);
 
+		String surlport = settings.getString("urlport", "5540");
+		mRtspPort = parseIntOrDefault(surlport, 5540);
+
+		mAudioEnabled = settings.getBoolean("audio_enable", true);
 		String sabitrate = settings.getString("audio_bitrate", "64");
-		int abitrate = parseIntOrDefault(sabitrate, 64);
+		mAudioBitrateKbps = parseIntOrDefault(sabitrate, 64);
 
-		String s_serverType = settings.getString("serverType", "1");
-		int server_type = parseIntOrDefault(s_serverType, 1);// publish RTMP
+		mRecordEnabled = settings.getBoolean("record_enable", false);
+		mSecondaryEnabled = settings.getBoolean("secvideo_enable", true);
 
-		// RTSP server audio only mode
-		boolean is_rtsp = false;
-		if(server_type == MediaCaptureConfig.StreamerTypes.STREAM_TYPE_RTSP_SERVER.val()){
-			is_rtsp = true;
-			//Editor ed = settings.edit();
-			//ed.putString("urlrtmp", rtmp_url);
-			//ed.putBoolean("audio_enable", false);
-			//ed.putBoolean("record_enable", false);
-			//ed.apply();
-		}
-		
-		misAudioEnabled = settings.getBoolean("audio_enable", true);
-		
-		boolean is_secvideo= settings.getBoolean("secvideo_enable", true);
-		
-		MediaCaptureConfig config = capturer.getConfig();
+		mGpsEnabled = settings.getBoolean("gps_enable", true);
+		String sgpsinterval = settings.getString("gps_update_interval_ms", "1000");
+		mGpsUpdateIntervalMs = parseIntOrDefault(sgpsinterval, 1000);
 
-		//config.setCameraFacing(MediaCaptureConfig.CAMERA_FACING_FRONT);
-		
-		int ncm = config.getCaptureMode();
-		if(misAudioEnabled){
-			 ncm |= CaptureModes.PP_MODE_AUDIO.val();
-		}else{
-			ncm &= ~(CaptureModes.PP_MODE_AUDIO.val());
-		}
-		//config.setUseAVSync(false); //av sync off
-		config.setStreaming(true);
-		config.setCaptureMode(ncm);
-		config.setStreamType(server_type);
-		if(USE_RTSP_G711){
-			config.setAudioFormat( is_rtsp ? MediaCaptureConfig.TYPE_AUDIO_G711_MLAW: MediaCaptureConfig.TYPE_AUDIO_AAC);
-			config.setAudioBitrate(abitrate);
-			config.setAudioSamplingRate(is_rtsp?8000:44100); //hardcoded
-			config.setAudioChannels(is_rtsp?1:2);
-		}else{
-			config.setAudioFormat( MediaCaptureConfig.TYPE_AUDIO_AAC);
-			config.setAudioBitrate(abitrate);
-			config.setAudioSamplingRate(44100); //hardcoded
-			config.setAudioChannels(2);
-		}
-		if(is_rtsp){
-			String rtsp_url = "rtsp://@:"+settings.getString("urlport", "5540");
-			config.setUrl(rtsp_url);
-			config.setUrlSec(is_secvideo?rtsp_url:"");
-		}else{
-			config.setUrl(rtmp_url);
-			config.setUrlSec(is_secvideo?rtmp_url+"2":"");
-		}
-		/*
-		//START RTSP + RTMP together
-		String rtsp_url = "rtsp://@:"+settings.getString("urlport", "5540");
-		config.setUrl(MediaCaptureConfig.StreamerTypes.STREAM_TYPE_RTSP_SERVER.val(), rtsp_url);
-		config.setUrlSec(MediaCaptureConfig.StreamerTypes.STREAM_TYPE_RTSP_SERVER.val(), is_secvideo?rtsp_url:"");
-		config.setUrl(MediaCaptureConfig.StreamerTypes.STREAM_TYPE_RTMP_PUBLISH.val(), rtmp_url);
-		config.setUrlSec(MediaCaptureConfig.StreamerTypes.STREAM_TYPE_RTMP_PUBLISH.val(), is_secvideo?rtmp_url+"2":"");
-		*/
-		
-		if(USE_PORTRAIT_MODE){
-			config.setvideoOrientation(90); //portrait
-		}else{
-			config.setvideoOrientation(0); //landscape
-		}
-		config.setVideoFramerate(30);
-		config.setVideoKeyFrameInterval(1);
-		config.setVideoBitrate(vbitrate);
+		// serverType / bitrateMode are read by SettingsActivity but not yet consumed here --
+		// bitrate-mode control is deferred to a later phase.
+	}
 
-		int bitrateMode = parseIntOrDefault(
-				settings.getString("bitrateMode", ""+MediaCaptureConfig.BITRATE_MODE_ADAPTIVE),
-				MediaCaptureConfig.BITRATE_MODE_ADAPTIVE);
-		config.setVideoBitrateMode(bitrateMode);
-		config.setVideoSecBitrateMode(bitrateMode);
-		if(bitrateMode == MediaCaptureConfig.BITRATE_MODE_ADAPTIVE){
-			config.setVideoMaxLatency(500); //0.5sec
-		}else{
-			config.setVideoMaxLatency(0); //no latency control
-		}
-		
-		List<CaptureVideoResolution> listRes = config.getVideoSupportedRes();
-		if(listRes != null && listRes.size()>0){
-			for(CaptureVideoResolution vr:listRes){
-				int w = (config.getVideoOrientation() == 0)? config.getVideoWidth(vr):config.getVideoHeight(vr);
-				if(w < resX){
-					Log.i(TAG, "load_config resolution="+resX+" not supported. Force set resolution="+w);
-					resX = w;
+	@Override
+	public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+		super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+		if (requestCode == CAMERA_PERMISSION_REQUEST) {
+			for (int i = 0; i < permissions.length; i++) {
+				if (grantResults[i] != PackageManager.PERMISSION_GRANTED) {
+					String label;
+					if (Manifest.permission.CAMERA.equals(permissions[i])) {
+						label = "Camera";
+					} else if (Manifest.permission.ACCESS_FINE_LOCATION.equals(permissions[i])) {
+						label = "Location";
+					} else {
+						label = "Microphone";
+					}
+					Toast.makeText(this, label + " permission denied", Toast.LENGTH_LONG).show();
 				}
-				break;
 			}
 		}
-
-		//test UHD		
-		//resX=3840;
-		switch( resX ){
-		case 3840:
-			config.setVideoResolution(CaptureVideoResolution.VR_3840x2160);
-			break;
-		case 1920:
-			config.setVideoResolution(CaptureVideoResolution.VR_1920x1080);
-			break;
-		case 1280:
-			config.setVideoResolution(CaptureVideoResolution.VR_1280x720);
-			break;
-		case 721:
-			config.setVideoResolution(CaptureVideoResolution.VR_720x576);
-			break;
-		case 720:
-			config.setVideoResolution(CaptureVideoResolution.VR_720x480);
-			break;
-		case 640:
-			config.setVideoResolution(CaptureVideoResolution.VR_640x480);
-			break;
-		case 352:
-			config.setVideoResolution(CaptureVideoResolution.VR_352x288);
-			break;
-		case 320:
-			config.setVideoResolution(CaptureVideoResolution.VR_320x240);
-			break;
-		case 176:
-			config.setVideoResolution(CaptureVideoResolution.VR_176x144);
-			break;
-		}
-		
-		if(config.getVideoWidth() == 320 || config.getVideoWidth() == 240){
-			config.setSecVideoResolution(CaptureVideoResolution.VR_720x480);
-		}else{
-			config.setSecVideoResolution(CaptureVideoResolution.VR_320x240);
-		}
-		config.setSecVideoFramerate(5);
-		config.setSecVideoKeyFrameInterval(2);
-		//config.setUseSec(is_rtsp && is_secvideo);
-
-		misRecfileEnabled = settings.getBoolean("record_enable", false);
-		//if(is_rtsp)
-		//	misRecfileEnabled = false;
-		//misRecfileEnabled = true;
-		config.setUseSec(true);
-		config.setUseSecRecord(true);
-		config.setRecordPrefixSec("secondary");
-		config.setRecording(misRecfileEnabled);
-		int record_flags = get_record_flags();
-		int rec_split_time = ( (record_flags & PlayerRecordFlags.forType(PlayerRecordFlags.PP_RECORD_SPLIT_BY_TIME)) != 0)? 30:0; //30 sec	
-		config.setRecordPath(getRecordPath());
-		config.setRecordFlags(record_flags);
-		config.setRecordSplitTime(rec_split_time);//in sec
-		config.setRecordSplitSize(10); //in MB
-		
-		//transcoding
-		misTranscodingEnabled = false;//settings.getBoolean("transcode_enable", true);
-		config.setTranscoding(misTranscodingEnabled);
-		config.setTransWidth(320);
-		config.setTransHeight(240);
-		config.setTransFps(1);
-		config.setTransFormat(MediaCaptureConfig.TYPE_VIDEO_RAW);
-		// Secure streaming requires a per-deployment private key and certificate;
-		// it must not be a value checked into source control. Disabled until a
-		// real key/cert is provisioned at runtime.
-		config.setSecureStreaming(false, null, null);
-
-		if (settings.getBoolean("capture_screen", false)) {
-			config.setCaptureSource(MediaCaptureConfig.CaptureSources.PP_MODE_VIRTUAL_DISPLAY.val());
-		}
-		else {
-			if(MediaCapture.DISABLE_CAMERA){
-				config.setCaptureSource(MediaCaptureConfig.CaptureSources.PP_MODE_SURFACE.val());
-			}else{
-				config.setCaptureSource(MediaCaptureConfig.CaptureSources.PP_MODE_CAMERA.val());
-			}
-		}
-
-		//config.setRecordTimeshift(10);
-
 	}
 
 	protected void onPause()
 	{
 		Log.e(TAG, "onPause()");
 		super.onPause();
-
-		if (capturer != null)
-			capturer.onPause();
 	}
 
 	@Override
-  	protected void onResume() 
+  	protected void onResume()
 	{
 		Log.e(TAG, "onResume()");
 		super.onResume();
-		if (capturer != null)
-			capturer.onResume();
   	}
 
   	@Override
-	protected void onStart() 
+	protected void onStart()
   	{
       	Log.e(TAG, "onStart()");
 		super.onStart();
 		sMainActivity = this;
-		
+
 		// Lock screen
 		mWakeLock.acquire();
-		
-		if (capturer != null)
-			capturer.onStart();
 	}
 
   	@Override
-	protected void onStop() 
+	protected void onStop()
   	{
   		Log.e(TAG, "onStop()");
 		super.onStop();
-		if (capturer != null)
-			capturer.onStop();
-		
+
+		if (streamer != null && misStreaming) {
+			streamer.stop();
+			misStreaming = false;
+		}
+
 		// A WakeLock should only be released when isHeld() is true !
 		if (mWakeLock.isHeld()) mWakeLock.release();
-		
-		if (toastShot != null)
-			toastShot.cancel();
-		
-		if(misSurfaceCreated){
-			finish();
-		}
 	}
 
     @Override
-    public void onBackPressed() 
+    public void onBackPressed()
     {
-		if (toastShot != null)
-			toastShot.cancel();
-		
-		if(capturer != null)
-			capturer.Close();
-		
 		super.onBackPressed();
     }
-  	
-  	@Override
-  	public void onWindowFocusChanged(boolean hasFocus) 
-  	{
-  		Log.e(TAG, "onWindowFocusChanged(): " + hasFocus);
-  		super.onWindowFocusChanged(hasFocus);
-		if (capturer != null)
-			capturer.onWindowFocusChanged(hasFocus);
-  	}
 
   	@Override
-  	public void onLowMemory() 
-  	{
-  		Log.e(TAG, "onLowMemory()");
-  		super.onLowMemory();
-		//if (capturer != null)
-		//	capturer.onLowMemory();
-  	}
-
-  	@Override
-  	protected void onDestroy() 
+  	protected void onDestroy()
   	{
   		Log.e(TAG, "onDestroy()");
-		if (toastShot != null)
-			toastShot.cancel();
-		
-		if (capturer != null)
-			capturer.onDestroy();
-		
+
+		if (streamer != null && misStreaming) {
+			streamer.stop();
+			misStreaming = false;
+		}
+
 		System.gc();
-		
+
 		if (multicastLock != null) {
 		    multicastLock.release();
 		    multicastLock = null;
-		}		
+		}
 		super.onDestroy();
-   	}	
-	
+   	}
+
     @Override
-    public boolean onCreateOptionsMenu(Menu menu) 
+    public boolean onCreateOptionsMenu(Menu menu)
     {
 		super.onCreateOptionsMenu(menu);
 
@@ -871,12 +338,12 @@ public class MainActivity extends Activity implements MediaCaptureCallback
     }
 
 	@Override
-	public boolean onOptionsItemSelected(MenuItem item)  
+	public boolean onOptionsItemSelected(MenuItem item)
 	{
 		Intent intent;
+		int itemId = item.getItemId();
 
-		switch (item.getItemId()) {
-		case R.id.menu_settings:
+		if (itemId == R.id.menu_settings) {
 			if(isRec()){
 				Toast.makeText(this,"Press 'Stop Streaming' button  first", Toast.LENGTH_LONG).show();
 			}else{
@@ -885,15 +352,14 @@ public class MainActivity extends Activity implements MediaCaptureCallback
 				finish();
 			}
 			return true;
-			
-		case R.id.menu_exit:
+		} else if (itemId == R.id.menu_exit) {
 			if(isRec()){
 				Toast.makeText(this,"Press 'Stop Streaming' button  first", Toast.LENGTH_LONG).show();
 			}else{
 				finish();
 			}
 			return true;
-		default:
+		} else {
 			return super.onOptionsItemSelected(item);
 		}
 	}

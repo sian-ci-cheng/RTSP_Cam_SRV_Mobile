@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -17,10 +18,10 @@ import android.preference.Preference;
 import android.preference.PreferenceActivity;
 import android.preference.PreferenceManager;
 import android.preference.PreferenceScreen;
+import android.hardware.camera2.CameraManager;
 import android.util.Log;
-import veg.mediacapture.sdk.MediaCaptureConfig;
-import veg.mediacapture.sdk.MediaCaptureConfig.CaptureVideoResolution;
 import veg.mediacapture.sdk.test.demo.R;
+import veg.mediacapture.sdk.test.rtspserver.CameraCapabilities;
 
 
 @SuppressWarnings("deprecation")
@@ -265,21 +266,15 @@ public class SettingsActivity extends PreferenceActivity {
 		
 		List<CharSequence> resNewE = new ArrayList<CharSequence>();
 		List<CharSequence> resNewEV = new ArrayList<CharSequence>();
-		if( MainActivity.sMainActivity != null && MainActivity.sMainActivity.mConfig != null){
-			MediaCaptureConfig config = MainActivity.sMainActivity.mConfig;
-			List<MediaCaptureConfig.CaptureVideoResolution> resList = config.getVideoSupportedRes();
-			for(MediaCaptureConfig.CaptureVideoResolution vr : resList){
-				String svr = ""+((config.getVideoOrientation() == 0)?config.getVideoWidth(vr):config.getVideoHeight(vr));
-				if(config.getVideoResolution() == MediaCaptureConfig.CaptureVideoResolution.VR_720x576){
-					svr = "721";
-				}
-				int i;
-				for(i = 0; i<resEV.length; i++){
-					if(resEV[i].toString().equals(svr)){
-						resNewE.add(resE[i]);
-						resNewEV.add(resEV[i]);
-						break;
-					}
+		CameraManager cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+		List<Integer> supportedWidths = CameraCapabilities.supportedWidths(cameraManager);
+		for (int width : supportedWidths) {
+			String svr = "" + width;
+			for (int i = 0; i < resEV.length; i++) {
+				if (resEV[i].toString().equals(svr)) {
+					resNewE.add(resE[i]);
+					resNewEV.add(resEV[i]);
+					break;
 				}
 			}
 		}

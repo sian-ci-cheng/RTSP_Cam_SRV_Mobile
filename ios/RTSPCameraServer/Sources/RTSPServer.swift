@@ -38,6 +38,9 @@ final class RTSPServer {
     private var baseMediaTime: CMTime?
     private var audioTimestamp: UInt32 = 0
 
+    private var videoListenerID: UUID?
+    private var audioListenerID: UUID?
+
     var onStatusChange: ((String) -> Void)?
 
     /// `audioEncoder` is optional: pass nil (or one that never produces an AudioSpecificConfig,
@@ -46,10 +49,10 @@ final class RTSPServer {
         self.port = port
         self.encoder = encoder
         self.audioEncoder = audioEncoder
-        self.encoder.onEncodedFrame = { [weak self] frame in
+        self.videoListenerID = self.encoder.addListener { [weak self] frame in
             self?.broadcast(frame: frame)
         }
-        self.audioEncoder?.onEncodedFrame = { [weak self] frame in
+        self.audioListenerID = self.audioEncoder?.addListener { [weak self] frame in
             self?.broadcastAudio(frame: frame)
         }
     }
@@ -82,6 +85,8 @@ final class RTSPServer {
     }
 
     func stop() {
+        if let videoListenerID { encoder.removeListener(videoListenerID) }
+        if let audioListenerID { audioEncoder?.removeListener(audioListenerID) }
         queue.async { [weak self] in
             guard let self else { return }
             self.clients.values.forEach { $0.connection.cancel() }

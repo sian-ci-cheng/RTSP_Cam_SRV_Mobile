@@ -4,7 +4,7 @@
     android:layout_height="fill_parent"
     >
 
-    <veg.mediacapture.sdk.MediaCapture
+    <TextureView
        android:id="@+id/captureView"
        android:layout_width="fill_parent"
        android:layout_height="fill_parent"

@@ -22,6 +22,16 @@ struct ContentView: View {
                 Toggle("Record Audio", isOn: $viewModel.wantsAudio)
             }
 
+            if viewModel.isRunning {
+                if viewModel.isRecordingEnabled {
+                    Label(viewModel.recordingErrorText ?? "Recording to file", systemImage: "record.circle")
+                        .font(.subheadline)
+                        .foregroundStyle(viewModel.recordingErrorText == nil ? .red : .secondary)
+                }
+            } else {
+                Toggle("Record to Local File", isOn: $viewModel.wantsLocalRecording)
+            }
+
             Picker("Resolution", selection: $viewModel.resolution) {
                 ForEach(viewModel.availableResolutions) { resolution in
                     Text(resolution.rawValue).tag(resolution)
@@ -61,12 +71,16 @@ struct ContentView: View {
 final class StreamViewModel: ObservableObject {
     let camera = CameraCaptureManager()
     private var server: RTSPServer?
+    private var recorder: LocalRecorder?
 
     @Published var isRunning = false
     @Published var statusText = "Stopped"
     @Published var addresses: [String] = []
     @Published var isAudioEnabled = false
     @Published var wantsAudio = true
+    @Published var wantsLocalRecording = false
+    @Published var isRecordingEnabled = false
+    @Published var recordingErrorText: String?
     @Published var resolution: StreamResolution
     let availableResolutions: [StreamResolution]
 
@@ -101,6 +115,30 @@ final class StreamViewModel: ObservableObject {
                 self.isRunning = true
                 self.isAudioEnabled = self.camera.isAudioEnabled
                 self.statusText = "Starting..."
+
+                // A failure here (disk full, writer error) only ever affects the recording, never
+                // the live stream: LocalRecorder is just another independent subscriber of the
+                // same encoders. Pass audioEncoder only when audio actually started -- otherwise
+                // LocalRecorder would wait forever for an audio track that will never arrive.
+                self.recordingErrorText = nil
+                self.isRecordingEnabled = false
+                if self.wantsLocalRecording {
+                    let url = Self.makeRecordingURL()
+                    let recorder = LocalRecorder(
+                        outputURL: url,
+                        videoEncoder: self.camera.encoder,
+                        audioEncoder: self.isAudioEnabled ? self.camera.audio.encoder : nil
+                    )
+                    recorder.onError = { [weak self] message in
+                        DispatchQueue.main.async { self?.recordingErrorText = message }
+                    }
+                    if recorder.start() {
+                        self.recorder = recorder
+                        self.isRecordingEnabled = true
+                    } else {
+                        self.recordingErrorText = "Recording failed to start"
+                    }
+                }
             }
         }
     }
@@ -108,10 +146,18 @@ final class StreamViewModel: ObservableObject {
     private func stop() {
         server?.stop()
         server = nil
+        recorder?.stop()
+        recorder = nil
         camera.stop()
         isRunning = false
         isAudioEnabled = false
+        isRecordingEnabled = false
         statusText = "Stopped"
+    }
+
+    private static func makeRecordingURL() -> URL {
+        let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return directory.appendingPathComponent("stream_\(Int(Date().timeIntervalSince1970 * 1000)).mp4")
     }
 }
 
