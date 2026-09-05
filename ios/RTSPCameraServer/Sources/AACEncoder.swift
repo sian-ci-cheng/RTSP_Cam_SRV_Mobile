@@ -30,6 +30,10 @@ final class AACEncoder {
     private var converter: AVAudioConverter?
     private var nativeFormat: AVAudioFormat?
     private var outputFormat: AVAudioFormat?
+    /// Built with the AudioSpecificConfig as its magic cookie -- unlike `outputFormat.formatDescription`
+    /// (from `AVAudioFormat(settings:)`, which carries no magic cookie), this is what AVAssetWriter
+    /// needs to accept compressed AAC samples and write a valid `esds` box into the MP4.
+    private var sampleBufferFormatDescription: CMFormatDescription?
     private let queue = DispatchQueue(label: "AACEncoder.queue")
 
     @discardableResult
@@ -40,7 +44,7 @@ final class AACEncoder {
     }
 
     func removeListener(_ id: UUID) {
-        queue.sync { listeners.removeValue(forKey: id) }
+        queue.sync { _ = listeners.removeValue(forKey: id) }
     }
 
     func start() {
@@ -55,7 +59,13 @@ final class AACEncoder {
             }
 
             self.outputFormat = outputFormat
-            self.audioSpecificConfig = Self.buildAudioSpecificConfig(channels: Self.channels)
+            let audioSpecificConfig = Self.buildAudioSpecificConfig(channels: Self.channels)
+            self.audioSpecificConfig = audioSpecificConfig
+            self.sampleBufferFormatDescription = Self.buildFormatDescription(
+                sampleRate: Self.sampleRate,
+                channels: Self.channels,
+                magicCookie: audioSpecificConfig
+            )
         }
     }
 
@@ -65,6 +75,7 @@ final class AACEncoder {
             nativeFormat = nil
             outputFormat = nil
             audioSpecificConfig = nil
+            sampleBufferFormatDescription = nil
         }
     }
 
@@ -81,6 +92,7 @@ final class AACEncoder {
             }
 
             guard let converter = self.converter, let outputFormat = self.outputFormat,
+                  let sampleBufferFormatDescription = self.sampleBufferFormatDescription,
                   let (pcmBuffer, retainedBlockBuffer) = self.pcmBuffer(from: sampleBuffer, format: sourceFormat) else { return }
             // `retainedBlockBuffer` backs pcmBuffer's storage (no-copy) and must outlive the convert() call below.
             _ = retainedBlockBuffer
@@ -102,7 +114,7 @@ final class AACEncoder {
 
             guard status == .haveData, conversionError == nil, outputBuffer.byteLength > 0 else { return }
             let data = Data(bytes: outputBuffer.data, count: Int(outputBuffer.byteLength))
-            guard let sampleBuffer = Self.makeSampleBuffer(from: outputBuffer, formatDescription: outputFormat.formatDescription, presentationTimeStamp: pts) else { return }
+            guard let sampleBuffer = Self.makeSampleBuffer(from: outputBuffer, formatDescription: sampleBufferFormatDescription, presentationTimeStamp: pts) else { return }
             let frame = EncodedFrame(data: data, presentationTimeStamp: pts, sampleBuffer: sampleBuffer)
             // Already running on `queue` here, so this is safe without an extra lock/snapshot.
             for listener in self.listeners.values { listener(frame) }
@@ -193,6 +205,41 @@ final class AACEncoder {
         )
         guard sbStatus == noErr else { return nil }
         return sampleBuffer
+    }
+
+    /// Builds a CMFormatDescription for raw AAC-LC carrying `magicCookie` (the AudioSpecificConfig)
+    /// as its magic cookie. `AVAudioFormat(settings:)` produces a format description with no magic
+    /// cookie at all, which AVAssetWriter needs to write a correct `esds` box for the audio track.
+    private static func buildFormatDescription(sampleRate: Double, channels: UInt32, magicCookie: Data) -> CMFormatDescription? {
+        var asbd = AudioStreamBasicDescription(
+            mSampleRate: sampleRate,
+            mFormatID: kAudioFormatMPEG4AAC,
+            mFormatFlags: 0,
+            mBytesPerPacket: 0,
+            mFramesPerPacket: samplesPerFrame,
+            mBytesPerFrame: 0,
+            mChannelsPerFrame: channels,
+            mBitsPerChannel: 0,
+            mReserved: 0
+        )
+        var formatDescription: CMFormatDescription?
+        let status = magicCookie.withUnsafeBytes { (cookieBytes: UnsafeRawBufferPointer) -> OSStatus in
+            CMAudioFormatDescriptionCreate(
+                allocator: kCFAllocatorDefault,
+                asbd: &asbd,
+                layoutSize: 0,
+                layout: nil,
+                magicCookieSize: cookieBytes.count,
+                magicCookie: cookieBytes.baseAddress,
+                extensions: nil,
+                formatDescriptionOut: &formatDescription
+            )
+        }
+        guard status == noErr else {
+            print("AACEncoder: failed to build format description with magic cookie, status=\(status)")
+            return nil
+        }
+        return formatDescription
     }
 
     private static func samplingFrequencyIndex(for sampleRate: Double) -> UInt8 {

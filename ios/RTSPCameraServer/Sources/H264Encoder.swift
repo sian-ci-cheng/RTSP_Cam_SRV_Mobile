@@ -35,7 +35,7 @@ final class H264Encoder {
     }
 
     func removeListener(_ id: UUID) {
-        queue.sync { listeners.removeValue(forKey: id) }
+        queue.sync { _ = listeners.removeValue(forKey: id) }
     }
 
     func start(width: Int32, height: Int32, bitrate: Int32 = 4_000_000, fps: Int32 = 30) {

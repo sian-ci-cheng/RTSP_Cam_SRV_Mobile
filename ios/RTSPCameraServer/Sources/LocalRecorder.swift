@@ -44,7 +44,14 @@ final class LocalRecorder {
     @discardableResult
     func start() -> Bool {
         do {
-            writer = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
+            let newWriter = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
+            // Without this, the moov atom (sample table) is only written once finishWriting()
+            // completes -- if the process dies mid-recording (killed, crashes, camera session
+            // interrupted) for any reason, the file is left as bare mdat data with no way to
+            // play it back. Periodic fragments each carry their own moof/mdat pair, so whatever
+            // was flushed before an unclean stop is still a valid, playable (fragmented) MP4.
+            newWriter.movieFragmentInterval = CMTime(seconds: 2, preferredTimescale: 600)
+            writer = newWriter
         } catch {
             onError?("failed to create AVAssetWriter: \(error.localizedDescription)")
             return false
@@ -76,6 +83,9 @@ final class LocalRecorder {
             writer.finishWriting { semaphore.signal() }
             semaphore.wait()
         } else {
+            if let writerError = writer.error {
+                onError?("recording ended abnormally: \(Self.describe(writerError))")
+            }
             writer.cancelWriting()
         }
         self.writer = nil
@@ -143,7 +153,18 @@ final class LocalRecorder {
             onError?("failed to start writer: \(writer.error?.localizedDescription ?? "unknown")")
             return
         }
-        let startTime = CMSampleBufferGetPresentationTimeStamp(firstVideoSample)
+        // Camera and microphone capture run on separate hardware pipelines with slightly
+        // different startup latency, so the very first audio sample can carry an earlier
+        // presentation timestamp than the first video sample. AVAssetWriter rejects any sample
+        // appended with a PTS before the session's start time, so the start time has to be the
+        // earliest of the two, not just the video's -- otherwise every early audio sample fails.
+        var startTime = CMSampleBufferGetPresentationTimeStamp(firstVideoSample)
+        if let firstAudioSample = pendingAudio.first {
+            let audioStartTime = CMSampleBufferGetPresentationTimeStamp(firstAudioSample)
+            if CMTimeCompare(audioStartTime, startTime) < 0 {
+                startTime = audioStartTime
+            }
+        }
         writer.startSession(atSourceTime: startTime)
         sessionStarted = true
 
@@ -156,7 +177,17 @@ final class LocalRecorder {
     private func append(_ sampleBuffer: CMSampleBuffer, to input: AVAssetWriterInput?) {
         guard let input, input.isReadyForMoreMediaData else { return }
         if !input.append(sampleBuffer) {
-            onError?("failed to append sample: \(writer?.error?.localizedDescription ?? "unknown")")
+            onError?("failed to append \(input.mediaType.rawValue) sample: \(Self.describe(writer?.error)); writer.status=\(writer?.status.rawValue ?? -1)")
         }
+    }
+
+    private static func describe(_ error: Error?) -> String {
+        guard let error else { return "nil" }
+        let nsError = error as NSError
+        var parts = "\(nsError.domain) code=\(nsError.code) \(nsError.localizedDescription)"
+        if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError {
+            parts += " | underlying: \(underlying.domain) code=\(underlying.code) \(underlying.localizedDescription)"
+        }
+        return parts
     }
 }

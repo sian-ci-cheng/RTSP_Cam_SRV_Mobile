@@ -22,6 +22,12 @@
 	<string>Used to stream the camera over RTSP.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Used to stream audio alongside the camera over RTSP.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Used to save local recordings to your Photos library.</string>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>UILaunchScreen</key>
 	<dict/>
 </dict>

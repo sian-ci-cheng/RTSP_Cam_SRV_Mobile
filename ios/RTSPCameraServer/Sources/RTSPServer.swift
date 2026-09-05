@@ -62,6 +62,10 @@ final class RTSPServer {
             guard let self else { return }
             do {
                 let params = NWParameters.tcp
+                // Without this, a quick Stop/Start (or the previous run's socket still in
+                // TIME_WAIT) makes the new listener fail with "Address already in use" instead
+                // of just rebinding, since the OS won't let another socket claim the port yet.
+                params.allowLocalEndpointReuse = true
                 let listener = try NWListener(using: params, on: NWEndpoint.Port(rawValue: self.port)!)
                 listener.newConnectionHandler = { [weak self] connection in
                     self?.accept(connection)
@@ -84,16 +88,22 @@ final class RTSPServer {
         }
     }
 
+    /// Blocks until the listener has actually been cancelled -- returning early (the previous
+    /// `queue.async` version) let a fresh `start()` race the old listener's teardown and try to
+    /// bind port 8554 while it was still held, failing with "Address already in use".
     func stop() {
         if let videoListenerID { encoder.removeListener(videoListenerID) }
         if let audioListenerID { audioEncoder?.removeListener(audioListenerID) }
+        let semaphore = DispatchSemaphore(value: 0)
         queue.async { [weak self] in
+            defer { semaphore.signal() }
             guard let self else { return }
             self.clients.values.forEach { $0.connection.cancel() }
             self.clients.removeAll()
             self.listener?.cancel()
             self.listener = nil
         }
+        semaphore.wait()
     }
 
     private func accept(_ connection: NWConnection) {

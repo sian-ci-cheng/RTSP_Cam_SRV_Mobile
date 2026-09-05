@@ -93,12 +93,16 @@ final class CameraCaptureManager: NSObject {
         }
     }
 
+    /// Blocks until the session has actually stopped and the encoder/audio have released the
+    /// hardware -- returning early (the previous `captureQueue.async` version) let a fresh
+    /// `start()`/`configureSession()` race the old session's teardown and hit the camera while
+    /// it was still busy, surfacing as a FigCaptureSourceRemote error from AVFCapture.
     func stop() {
-        captureQueue.async { [weak self] in
-            self?.session.stopRunning()
-            self?.encoder.stop()
-            self?.audio.stop()
+        captureQueue.sync {
+            session.stopRunning()
+            encoder.stop()
         }
+        audio.stop()
     }
 }
 

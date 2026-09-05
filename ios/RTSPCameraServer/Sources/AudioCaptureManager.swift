@@ -36,8 +36,8 @@ final class AudioCaptureManager: NSObject {
     }
 
     func stop() {
-        captureQueue.async { [weak self] in
-            self?.encoder.stop()
+        captureQueue.sync {
+            encoder.stop()
         }
     }
 }
