@@ -13,6 +13,9 @@ targets:
       properties:
         NSCameraUsageDescription: "Used to stream the camera over RTSP."
         NSMicrophoneUsageDescription: "Used to stream audio alongside the camera over RTSP."
+        NSPhotoLibraryAddUsageDescription: "Used to save local recordings to your Photos library."
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
         UILaunchScreen: {}
     settings:
       base:

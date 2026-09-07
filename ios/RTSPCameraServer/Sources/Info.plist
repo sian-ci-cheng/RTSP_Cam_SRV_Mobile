@@ -18,6 +18,8 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Used to stream the camera over RTSP.</string>
 	<key>NSMicrophoneUsageDescription</key>
@@ -25,8 +27,6 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Used to save local recordings to your Photos library.</string>
 	<key>UIFileSharingEnabled</key>
-	<true/>
-	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
 	<key>UILaunchScreen</key>
 	<dict/>
