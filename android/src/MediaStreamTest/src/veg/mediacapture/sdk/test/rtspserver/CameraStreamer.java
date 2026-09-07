@@ -228,7 +228,7 @@ public final class CameraStreamer {
     }
 
     private String readyStatus() {
-        return "RTSP ON (rtsp://" + NetworkUtils.wifiIpAddress(context) + ":" + port + ")";
+        return "RTSP ON (rtsp://" + NetworkUtils.wifiIpAddress() + ":" + port + ")";
     }
 
     private void notifyStatus(String status) {
