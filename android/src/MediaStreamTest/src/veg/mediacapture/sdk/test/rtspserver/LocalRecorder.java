@@ -22,6 +22,10 @@ import java.util.List;
 final class LocalRecorder implements H264Encoder.Listener, AACEncoder.Listener, GPSLocationManager.Listener {
     private static final String TAG = "LocalRecorder";
 
+    /** Degrees to rotate on playback so the recorded MP4 matches what the on-device preview
+     *  shows -- see the comment at muxer.setOrientationHint() below for why this is needed. */
+    private static final int VIDEO_ORIENTATION_HINT_DEGREES = 90;
+
     interface Listener {
         void onError(String message);
     }
@@ -230,6 +234,13 @@ final class LocalRecorder implements H264Encoder.Listener, AACEncoder.Listener, 
         if (!videoTrackAdded) return;
         if (audioExpected && !audioTrackAdded) return;
 
+        // The raw frames fed to the encoder are in the sensor's native orientation (the on-screen
+        // TextureView preview is corrected via a separate display-only transform matrix that never
+        // touches this pixel data -- see CameraStreamer.configurePreviewTransform). This container-
+        // level rotation hint (no pixel data touched, no re-encoding) lets standard players rotate
+        // the file back to upright on playback; it does not affect the raw RTSP H.264 stream, which
+        // has no equivalent metadata mechanism.
+        muxer.setOrientationHint(VIDEO_ORIENTATION_HINT_DEGREES);
         muxer.start();
         muxerStarted = true;
 
